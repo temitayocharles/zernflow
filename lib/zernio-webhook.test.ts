@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { createHmac } from "node:crypto";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ensureWebhookRegistered,
   generateWebhookSecret,
@@ -9,39 +8,6 @@ import {
   verifyWebhookSignature,
   WEBHOOK_NAME,
 } from "./zernio-webhook";
-
-interface CapturedUpdate {
-  table: string;
-  patch: Record<string, unknown>;
-}
-
-function makeFakeSupabase(seed: { webhook_secret?: string | null }) {
-  const updates: CapturedUpdate[] = [];
-  const client = {
-    from(table: string) {
-      return {
-        select() {
-          return this;
-        },
-        eq() {
-          return this;
-        },
-        single() {
-          return Promise.resolve({ data: { webhook_secret: seed.webhook_secret ?? null }, error: null });
-        },
-        update(patch: Record<string, unknown>) {
-          return {
-            eq() {
-              updates.push({ table, patch });
-              return Promise.resolve({ data: null, error: null });
-            },
-          };
-        },
-      };
-    },
-  };
-  return { client: client as unknown as SupabaseClient, updates };
-}
 
 /**
  * Builds a fake Zernio client exposing only the `webhooks` surface used by
@@ -254,24 +220,24 @@ describe("generateWebhookSecret", () => {
 });
 
 describe("getOrCreateWorkspaceWebhookSecret", () => {
-  it("returns the existing secret without writing (AC5)", async () => {
-    const fake = makeFakeSupabase({ webhook_secret: "existing-secret" });
-    const secret = await getOrCreateWorkspaceWebhookSecret(fake.client, "ws-1");
+  const original = process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
 
-    expect(secret).toBe("existing-secret");
-    expect(fake.updates).toHaveLength(0);
+  afterEach(() => {
+    if (original === undefined) delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
+    else process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = original;
   });
 
-  it("generates, persists and returns a new secret when missing (AC1, AC5)", async () => {
-    const fake = makeFakeSupabase({ webhook_secret: null });
-    const secret = await getOrCreateWorkspaceWebhookSecret(fake.client, "ws-1");
+  it("returns the runtime-managed secret without touching Supabase", async () => {
+    process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = "vault-managed-secret";
+    const secret = await getOrCreateWorkspaceWebhookSecret({}, "ws-1");
+    expect(secret).toBe("vault-managed-secret");
+  });
 
-    expect(secret).toMatch(/^[0-9a-f]{64}$/);
-    expect(fake.updates).toHaveLength(1);
-    expect(fake.updates[0]).toMatchObject({
-      table: "workspaces",
-      patch: { webhook_secret: secret },
-    });
+  it("fails closed when the runtime secret is missing", async () => {
+    delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
+    await expect(getOrCreateWorkspaceWebhookSecret({}, "ws-1")).rejects.toThrow(
+      "SOCIAL_GATEWAY_WEBHOOK_SECRET",
+    );
   });
 });
 
@@ -297,30 +263,28 @@ describe("verifyWebhookSignature (AC4)", () => {
   });
 });
 
-describe("resolveWebhookSecret (AC4)", () => {
-  it("prefers the workspace secret over the channel secret", async () => {
-    const fake = makeFakeSupabase({ webhook_secret: "ws-secret" });
-    const secret = await resolveWebhookSecret(fake.client, {
-      workspace_id: "ws-1",
-      webhook_secret: "legacy-channel-secret",
-    });
-    expect(secret).toBe("ws-secret");
+describe("resolveWebhookSecret", () => {
+  const original = process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
+    else process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = original;
   });
 
-  it("falls back to the legacy channel secret when workspace has none", async () => {
-    const fake = makeFakeSupabase({ webhook_secret: null });
-    const secret = await resolveWebhookSecret(fake.client, {
+  it("returns only the runtime-managed secret", async () => {
+    process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = "vault-secret";
+    const secret = await resolveWebhookSecret({}, {
       workspace_id: "ws-1",
-      webhook_secret: "legacy-channel-secret",
+      webhook_secret: "legacy-row-secret",
     });
-    expect(secret).toBe("legacy-channel-secret");
+    expect(secret).toBe("vault-secret");
   });
 
-  it("returns null when neither secret is set", async () => {
-    const fake = makeFakeSupabase({ webhook_secret: null });
-    const secret = await resolveWebhookSecret(fake.client, {
+  it("does not fall back to a database-row secret", async () => {
+    delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
+    const secret = await resolveWebhookSecret({}, {
       workspace_id: "ws-1",
-      webhook_secret: null,
+      webhook_secret: "legacy-row-secret",
     });
     expect(secret).toBeNull();
   });

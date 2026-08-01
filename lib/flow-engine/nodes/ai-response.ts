@@ -24,19 +24,13 @@ export async function executeAiResponse(
   context: FlowExecutionContext,
   sessionId: string
 ) {
-  // Get workspace for Zernio API key + AI Gateway key
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted, ai_api_key")
-    .eq("id", context.workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) {
-    console.error("No Zernio API key for workspace:", context.workspaceId);
+  let gateway;
+  try {
+    gateway = createSocialGatewayClient();
+  } catch (error) {
+    console.error("Social gateway is not configured:", error);
     return cancelRun(supabase, sessionId);
   }
-
-  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
 
   // Resolve late_account_id from channel if not in context
   let lateAccountId = context.lateAccountId;
@@ -99,7 +93,7 @@ export async function executeAiResponse(
 
   try {
     const model = data.model || "openai/gpt-4o-mini";
-    const aiGatewayKey = workspace.ai_api_key || process.env.AI_GATEWAY_API_KEY;
+    const aiGatewayKey = process.env.AI_GATEWAY_API_KEY;
     const gw = createGateway({ apiKey: aiGatewayKey || undefined });
     const result = await generateText({
       model: gw(model),
@@ -115,7 +109,7 @@ export async function executeAiResponse(
     context.variables = { ...(context.variables ?? {}), ai_response: text };
 
     if (data.sendDirectly !== false) {
-      // Send via Zernio REST API (same pattern as executeSendMessage)
+      // Send through the configured social gateway
       const response = await gateway.conversations.send({
         conversationId: lateConversationId,
         accountId: lateAccountId,

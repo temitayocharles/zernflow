@@ -438,16 +438,8 @@ async function executeSendMessage(
   data: SendMessageNodeData,
   context: FlowExecutionContext
 ) {
-  // Get workspace for API key
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", context.workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) return;
-
-  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+  // Resolve the configured social gateway
+  const gateway = createSocialGatewayClient();
 
   // Resolve late_account_id from channel if not in context
   let lateAccountId = context.lateAccountId;
@@ -848,15 +840,7 @@ async function executeCommentReply(
   data: CommentReplyNodeData,
   context: FlowExecutionContext
 ) {
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", context.workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) return;
-
-  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient();
 
   // Resolve late_account_id
   let lateAccountId = context.lateAccountId;
@@ -903,15 +887,7 @@ async function executePrivateReply(
   data: PrivateReplyNodeData,
   context: FlowExecutionContext
 ) {
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", context.workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) return;
-
-  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient();
 
   // Resolve late_account_id
   let lateAccountId = context.lateAccountId;

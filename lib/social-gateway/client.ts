@@ -1,5 +1,7 @@
 import Zernio from "@zernio/node";
 
+export type RuntimeEnv = Record<string, string | undefined>;
+
 export type GatewayPlatform =
   | "facebook"
   | "instagram"
@@ -125,9 +127,175 @@ function normalize<T = unknown>(response: unknown): GatewayResponse<T> {
   };
 }
 
+function normalizeBaseUrl(value: string): string {
+  const normalized = value.trim().replace(/\/$/, "");
+  const parsed = new URL(normalized);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('SOCIAL_GATEWAY_BASE_URL must use HTTP or HTTPS');
+  }
+  return normalized;
+}
+
+async function parseResponse(response: Response): Promise<unknown> {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) return response.json();
+  const text = await response.text();
+  return text ? { message: text.slice(0, 2048) } : undefined;
+}
+
+export class AgentSocialGatewayHttpAdapter implements SocialGatewayClient {
+  private readonly baseUrl: string;
+  private readonly apiKey: string;
+
+  constructor(input: { baseUrl: string; apiKey: string }) {
+    this.baseUrl = normalizeBaseUrl(input.baseUrl);
+    this.apiKey = input.apiKey.trim();
+    if (!this.apiKey) throw new Error('SOCIAL_GATEWAY_API_KEY is required');
+  }
+
+  private async request<T>(path: string, init?: RequestInit): Promise<GatewayResponse<T>> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      ...init,
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-Key': this.apiKey,
+        ...(init?.headers || {}),
+      },
+    });
+    const payload = await parseResponse(response);
+    if (!response.ok) {
+      return { error: payload, status: response.status };
+    }
+    return { data: payload as T, status: response.status };
+  }
+
+  readonly profiles = {
+    list: () => this.request<{ profiles?: Array<{ _id?: string }> }>('/v1/profiles'),
+  };
+
+  readonly connections = {
+    getConnectUrl: (input: {
+      platform: GatewayPlatform;
+      profileId: string;
+      redirectUrl: string;
+    }) =>
+      this.request<{ authUrl?: string }>(
+        `/v1/connections/${encodeURIComponent(input.platform)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            profile_id: input.profileId,
+            redirect_url: input.redirectUrl,
+          }),
+        },
+      ),
+  };
+
+  readonly accounts = {
+    list: () => this.request<{ accounts?: GatewayAccount[] }>('/v1/accounts'),
+    disconnect: (input: { accountId: string }) =>
+      this.request(`/v1/accounts/${encodeURIComponent(input.accountId)}`, {
+        method: 'DELETE',
+      }),
+  };
+
+  readonly conversations = {
+    list: (input: {
+      accountId: string;
+      limit: number;
+      sortOrder: 'asc' | 'desc';
+      cursor?: string;
+    }) => {
+      const query = new URLSearchParams({
+        limit: String(input.limit),
+        sort_order: input.sortOrder,
+      });
+      if (input.cursor) query.set('cursor', input.cursor);
+      return this.request<{
+        data?: unknown[];
+        pagination?: { hasMore?: boolean; nextCursor?: string };
+      }>(
+        `/v1/accounts/${encodeURIComponent(input.accountId)}/conversations?${query.toString()}`,
+      );
+    },
+    messages: (input: { conversationId: string; accountId: string }) =>
+      this.request<{ messages?: unknown[]; data?: unknown[] }>(
+        `/v1/accounts/${encodeURIComponent(input.accountId)}/conversations/${encodeURIComponent(input.conversationId)}/messages`,
+      ),
+    send: (input: SendConversationInput) =>
+      this.request<{ data?: { messageId?: string }; messageId?: string }>(
+        `/v1/accounts/${encodeURIComponent(input.accountId)}/conversations/${encodeURIComponent(input.conversationId)}/messages`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            message: input.message,
+            attachment_url: input.attachmentUrl,
+            attachment_type: input.attachmentType,
+            buttons: input.buttons,
+            quick_replies: input.quickReplies,
+            template: input.template,
+            reply_markup: input.replyMarkup,
+          }),
+        },
+      ),
+  };
+
+  readonly comments = {
+    replyPublic: (input: {
+      accountId: string;
+      postId: string;
+      commentId: string;
+      message: string;
+    }) =>
+      this.request(
+        `/v1/accounts/${encodeURIComponent(input.accountId)}/comments/${encodeURIComponent(input.commentId)}/replies`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ post_id: input.postId, message: input.message }),
+        },
+      ),
+    replyPrivate: (input: {
+      accountId: string;
+      postId: string;
+      commentId: string;
+      message: string;
+    }) =>
+      this.request(
+        `/v1/accounts/${encodeURIComponent(input.accountId)}/comments/${encodeURIComponent(input.commentId)}/private-replies`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ post_id: input.postId, message: input.message }),
+        },
+      ),
+  };
+
+  readonly webhooks = {
+    list: () => this.request<{ webhooks?: GatewayWebhook[] }>('/v1/webhooks'),
+    create: (input: {
+      name: string;
+      url: string;
+      secret: string;
+      events: string[];
+    }) => this.request('/v1/webhooks', { method: 'POST', body: JSON.stringify(input) }),
+    update: (input: {
+      id: string;
+      name: string;
+      url: string;
+      secret: string;
+      events: string[];
+    }) =>
+      this.request(`/v1/webhooks/${encodeURIComponent(input.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+  };
+}
+
 /**
- * Temporary compatibility adapter. It is the only module allowed to import
- * `@zernio/node`; callers depend on the provider-neutral interface above.
+ * Temporary hosted compatibility adapter. It is the only module allowed to
+ * import `@zernio/node`; callers depend on the provider-neutral interface.
  */
 export class ZernioCompatibilityAdapter implements SocialGatewayClient {
   private readonly sdk: Zernio;
@@ -292,6 +460,49 @@ export class ZernioCompatibilityAdapter implements SocialGatewayClient {
   };
 }
 
-export function createSocialGatewayClient(apiKey: string): SocialGatewayClient {
-  return new ZernioCompatibilityAdapter(apiKey);
+export type SocialGatewayDriver = 'agent' | 'zernio';
+
+export interface SocialGatewayRuntimeStatus {
+  driver: SocialGatewayDriver;
+  configured: boolean;
+  endpoint?: string;
+}
+
+export function getSocialGatewayRuntimeStatus(
+  env: RuntimeEnv = process.env,
+): SocialGatewayRuntimeStatus {
+  const driver = (env.SOCIAL_GATEWAY_DRIVER || 'agent').trim().toLowerCase();
+  if (driver === 'zernio') {
+    return {
+      driver: 'zernio',
+      configured: Boolean(env.ZERNIO_API_KEY?.trim()),
+    };
+  }
+  return {
+    driver: 'agent',
+    configured: Boolean(
+      env.SOCIAL_GATEWAY_BASE_URL?.trim() && env.SOCIAL_GATEWAY_API_KEY?.trim(),
+    ),
+    endpoint: env.SOCIAL_GATEWAY_BASE_URL?.trim(),
+  };
+}
+
+export function createSocialGatewayClient(
+  env: RuntimeEnv = process.env,
+): SocialGatewayClient {
+  const status = getSocialGatewayRuntimeStatus(env);
+  if (status.driver === 'zernio') {
+    const apiKey = env.ZERNIO_API_KEY?.trim();
+    if (!apiKey) throw new Error('ZERNIO_API_KEY is not configured');
+    return new ZernioCompatibilityAdapter(apiKey);
+  }
+
+  const baseUrl = env.SOCIAL_GATEWAY_BASE_URL?.trim();
+  const apiKey = env.SOCIAL_GATEWAY_API_KEY?.trim();
+  if (!baseUrl || !apiKey) {
+    throw new Error(
+      'SOCIAL_GATEWAY_BASE_URL and SOCIAL_GATEWAY_API_KEY must be injected by the runtime secret manager',
+    );
+  }
+  return new AgentSocialGatewayHttpAdapter({ baseUrl, apiKey });
 }

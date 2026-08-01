@@ -16,26 +16,26 @@ Work proceeds milestone by milestone. Every milestone must include tests, immuta
 - [x] Create controlled fork with upstream linkage.
 - [x] Reproduce install, tests, lint and production build.
 - [x] Record hosted-Zernio seams and secret-bearing fields.
-- [ ] Commit safe dependency upgrades and resolve remaining production advisories.
-- [ ] Add CI for test, lint, build and production dependency audit.
+- [x] Commit safe dependency upgrades and resolve remaining production advisories.
+- [x] Add CI for test, lint, build and production dependency audit.
 - [ ] Mirror the fork to Forgejo and make Forgejo authoritative.
 
 Exit gate: reproducible CI passes and no unreviewed high-severity production finding remains.
 
 ## Milestone 1 — Provider-neutral client seam
 
-- [ ] Define `SocialGatewayClient` interfaces for accounts, conversations, messages, comments, webhooks and capabilities.
-- [ ] Add a compatibility adapter implementing those interfaces through the current Zernio SDK.
-- [ ] Refactor routes, inbox sync, flow nodes, sequences and comment processing to depend only on the interface.
-- [ ] Add contract tests proving the adapter preserves behavior.
+- [x] Define `SocialGatewayClient` interfaces for accounts, conversations, messages, comments, webhooks and capabilities.
+- [x] Add a compatibility adapter implementing those interfaces through the current Zernio SDK.
+- [x] Refactor routes, inbox sync, flow nodes, sequences and comment processing to depend only on the interface.
+- [x] Add contract tests proving the adapter preserves behavior.
 
 Exit gate: no application module imports `@zernio/node` outside the compatibility adapter.
 
 ## Milestone 2 — Remove secret storage from workspaces
 
 - [ ] Add non-secret gateway connection records and provider-neutral external IDs.
-- [ ] Remove `late_api_key_encrypted`, workspace webhook secrets and AI secret values from operator-readable rows.
-- [ ] Store provider/AI secret material in Vault and keep only references in the backend.
+- [x] Remove `late_api_key_encrypted`, workspace webhook secrets and AI secret values from operator-readable rows.
+- [~] Store provider/AI secret material in Vault and keep only references in the backend. Runtime injection contract is complete; GitOps/Vault publication follows gateway deployment.
 - [ ] Add owner/admin/member RBAC and tighten RLS policies.
 - [ ] Add signed, replay-protected service authentication.
 
