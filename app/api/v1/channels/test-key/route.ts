@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createZernioClient } from "@/lib/zernio-client";
+import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 import {
   ensureWebhookRegistered,
   getOrCreateWorkspaceWebhookSecret,
@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
   // Validate the key by listing accounts
   let accounts: Array<{ _id?: string; platform?: string; username?: string; displayName?: string; profilePicture?: string }>;
   try {
-    const zernio = createZernioClient(apiKey.trim());
-    const res = await zernio.accounts.listAccounts();
+    const gateway = createSocialGatewayClient(apiKey.trim());
+    const res = await gateway.accounts.list();
     accounts = (res.data?.accounts ?? []) as typeof accounts;
   } catch (err) {
     const message =
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
     try {
       const secret = await getOrCreateWorkspaceWebhookSecret(supabase, workspaceId);
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      const zernio = createZernioClient(apiKey.trim());
-      await ensureWebhookRegistered(zernio, {
+      const gateway = createSocialGatewayClient(apiKey.trim());
+      await ensureWebhookRegistered(gateway, {
         appUrl,
         secret,
         events: ["message.received", "comment.received"],
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
       await backfillInboxConversations({
         supabase,
-        zernio: createZernioClient(apiKey.trim()),
+        gateway: createSocialGatewayClient(apiKey.trim()),
         workspaceId,
         channels: activeChannels ?? [],
       });

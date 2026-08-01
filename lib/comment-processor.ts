@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database";
 import { executeFlow } from "@/lib/flow-engine/engine";
-import { createZernioClient } from "@/lib/zernio-client";
+import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Trigger = Database["public"]["Tables"]["triggers"]["Row"];
@@ -177,14 +177,12 @@ export async function processComment({
 
       if (workspace?.late_api_key_encrypted) {
         try {
-          const zernio = createZernioClient(workspace.late_api_key_encrypted);
-          await zernio.comments.replyToInboxPost({
-            path: { postId: comment.postId },
-            body: {
-              accountId: channel.late_account_id,
-              message: config.replyText,
-              commentId: comment.id,
-            },
+          const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+          await gateway.comments.replyPublic({
+            postId: comment.postId,
+            commentId: comment.id,
+            accountId: channel.late_account_id,
+            message: config.replyText,
           });
           replySent = true;
         } catch (err) {

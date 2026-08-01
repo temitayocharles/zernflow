@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createZernioClient } from "@/lib/zernio-client";
+import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 
 /**
  * GET /api/v1/messages?conversationId=...
@@ -47,10 +47,10 @@ export async function GET(request: NextRequest) {
 
   // Fetch messages from Zernio API
   try {
-    const zernio = createZernioClient(workspace.late_api_key_encrypted);
-    const res = await zernio.messages.getInboxConversationMessages({
-      path: { conversationId: conversation.late_conversation_id },
-      query: { accountId: channel.late_account_id },
+    const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+    const res = await gateway.conversations.messages({
+      conversationId: conversation.late_conversation_id,
+      accountId: channel.late_account_id,
     });
 
     // The Zernio endpoint returns { success, messages: [...] } — NOT { data }.
@@ -144,10 +144,11 @@ export async function POST(request: NextRequest) {
 
   // Send via Zernio SDK — Zernio stores the message, no local insert needed
   try {
-    const zernio = createZernioClient(workspace.late_api_key_encrypted);
-    const res = await zernio.messages.sendInboxMessage({
-      path: { conversationId: conversation.late_conversation_id },
-      body: { accountId: channel.late_account_id, message: text },
+    const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+    const res = await gateway.conversations.send({
+      conversationId: conversation.late_conversation_id,
+      accountId: channel.late_account_id,
+      message: text,
     });
 
     const messageId = (res.data as any)?.data?.messageId ?? null;
