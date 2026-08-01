@@ -169,25 +169,17 @@ export async function processComment({
 
     let replySent = false;
     if (config.replyText) {
-      const { data: workspace } = await supabase
-        .from("workspaces")
-        .select("late_api_key_encrypted")
-        .eq("id", channel.workspace_id)
-        .single();
-
-      if (workspace?.late_api_key_encrypted) {
-        try {
-          const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
-          await gateway.comments.replyPublic({
-            postId: comment.postId,
-            commentId: comment.id,
-            accountId: channel.late_account_id,
-            message: config.replyText,
-          });
-          replySent = true;
-        } catch (err) {
-          console.error("Failed to post comment reply:", err);
-        }
+      try {
+        const gateway = createSocialGatewayClient();
+        await gateway.comments.replyPublic({
+          postId: comment.postId,
+          commentId: comment.id,
+          accountId: channel.late_account_id,
+          message: config.replyText,
+        });
+        replySent = true;
+      } catch (err) {
+        console.error("Failed to post comment reply:", err);
       }
     }
 

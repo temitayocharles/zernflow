@@ -544,20 +544,12 @@ async function processJob(
 
       if (recipient.status !== "pending") return;
 
-      // Get workspace API key
+      // Resolve the broadcast workspace
       const broadcast = recipient.broadcasts as { workspace_id: string } | null;
       if (!broadcast) return;
 
-      const { data: workspace } = await supabase
-        .from("workspaces")
-        .select("late_api_key_encrypted")
-        .eq("id", broadcast.workspace_id)
-        .single();
-
-      if (!workspace?.late_api_key_encrypted) return;
-
       const { createSocialGatewayClient } = await import("@/lib/social-gateway/client");
-      const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+      const gateway = createSocialGatewayClient();
 
       const channel = recipient.channels as { late_account_id: string } | null;
       if (!channel) return;

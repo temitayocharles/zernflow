@@ -27,9 +27,9 @@ async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) 
 /**
  * POST /api/v1/channels/sync
  *
- * Syncs all Zernio accounts as channels for the current workspace.
+ * Syncs all configured gateway accounts as channels for the current workspace.
  * Creates new channels for accounts not yet in the DB.
- * Deactivates channels whose Zernio accounts no longer exist.
+ * Deactivates channels whose gateway accounts no longer exist.
  */
 export async function POST() {
   const supabase = await createClient();
@@ -37,18 +37,12 @@ export async function POST() {
   if (!workspace)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!workspace.late_api_key_encrypted) {
-    return NextResponse.json(
-      { error: "Zernio API key not configured. Go to Settings first." },
-      { status: 400 }
-    );
-  }
 
-  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient();
 
   try {
     const res = await gateway.accounts.list();
-    const lateAccounts = res.data?.accounts ?? [];
+    const gatewayAccounts = res.data?.accounts ?? [];
 
     // Get existing channels for this workspace
     const { data: existingChannels } = await supabase
@@ -56,21 +50,21 @@ export async function POST() {
       .select("*")
       .eq("workspace_id", workspace.id);
 
-    const existingByZernioId = new Map(
+    const existingByGatewayId = new Map(
       (existingChannels ?? []).map((c) => [c.late_account_id, c])
     );
 
     // The SDK type doesn't declare profilePicture but the API returns it
-    const lateAccountIds = new Set(lateAccounts.map((a: { _id?: string }) => a._id).filter(Boolean));
+    const gatewayAccountIds = new Set(gatewayAccounts.map((a: { _id?: string }) => a._id).filter(Boolean));
     let created = 0;
     let updated = 0;
 
-    for (const account of lateAccounts) {
+    for (const account of gatewayAccounts) {
       if (!account._id) continue;
       const acc = account as typeof account & { profilePicture?: string };
       const profilePic = acc.profilePicture || null;
 
-      const existing = existingByZernioId.get(account._id);
+      const existing = existingByGatewayId.get(account._id);
 
       if (existing) {
         if (
@@ -102,10 +96,10 @@ export async function POST() {
       }
     }
 
-    // Deactivate channels whose Zernio accounts no longer exist
+    // Deactivate channels whose gateway accounts no longer exist
     let deactivated = 0;
     for (const channel of existingChannels ?? []) {
-      if (!lateAccountIds.has(channel.late_account_id) && channel.is_active) {
+      if (!gatewayAccountIds.has(channel.late_account_id) && channel.is_active) {
         await supabase
           .from("channels")
           .update({ is_active: false })

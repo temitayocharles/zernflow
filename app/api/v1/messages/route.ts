@@ -5,7 +5,7 @@ import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 /**
  * GET /api/v1/messages?conversationId=...
  *
- * Fetches messages from the Zernio API (source of truth) instead of a local mirror.
+ * Fetches messages from the configured social gateway instead of a local mirror.
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "conversationId required" }, { status: 400 });
   }
 
-  // Look up the Zernio conversation ID and workspace API key
+  // Look up the provider conversation and account references
   const { data: conversation } = await supabase
     .from("conversations")
     .select("late_conversation_id, workspace_id, channels(late_account_id)")
@@ -30,24 +30,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Conversation not found or missing Zernio ID" }, { status: 404 });
   }
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", conversation.workspace_id)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 400 });
-  }
 
   const channel = conversation.channels as { late_account_id: string } | null;
   if (!channel?.late_account_id) {
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
 
-  // Fetch messages from Zernio API
+  // Fetch messages from the social gateway
   try {
-    const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+    const gateway = createSocialGatewayClient();
     const res = await gateway.conversations.messages({
       conversationId: conversation.late_conversation_id,
       accountId: channel.late_account_id,
@@ -79,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(messages);
   } catch (error) {
-    console.error("Failed to fetch messages from Zernio API:", error);
+    console.error("Failed to fetch messages from social gateway:", error);
     return NextResponse.json(
       { error: "Failed to fetch messages" },
       { status: 500 }
@@ -90,7 +81,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/v1/messages
  *
- * Sends a message via Zernio API. No local message storage — Zernio is the source of truth.
+ * Sends a message through the configured social gateway.
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -132,19 +123,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Channel not found or missing Zernio account ID" }, { status: 404 });
   }
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", conversation.workspace_id)
-    .single();
 
-  if (!workspace?.late_api_key_encrypted) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 400 });
-  }
-
-  // Send via Zernio SDK — Zernio stores the message, no local insert needed
+  // Send through the configured social gateway
   try {
-    const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+    const gateway = createSocialGatewayClient();
     const res = await gateway.conversations.send({
       conversationId: conversation.late_conversation_id,
       accountId: channel.late_account_id,
@@ -183,7 +165,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Failed to send message via Zernio API:", error);
+    console.error("Failed to send message through social gateway:", error);
     return NextResponse.json(
       { error: `Failed to send message: ${error}` },
       { status: 500 }

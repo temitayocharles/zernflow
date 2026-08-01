@@ -141,19 +141,13 @@ async function sendSequenceMessage(
   channelId: string,
   text: string
 ) {
-  // Get workspace API key
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) {
-    console.error("No Zernio API key for workspace:", workspaceId);
+  let gateway;
+  try {
+    gateway = createSocialGatewayClient();
+  } catch (error) {
+    console.error("Social gateway is not configured for workspace:", workspaceId, error);
     return;
   }
-
-  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
 
   // Get channel's late_account_id
   const { data: channel } = await supabase

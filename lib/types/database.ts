@@ -77,8 +77,6 @@ export interface Database {
           id: string;
           name: string;
           slug: string;
-          late_api_key_encrypted: string | null;
-          ai_api_key: string | null;
           ai_provider: string;
           global_keywords: Json | null;
           created_at: string;
@@ -88,8 +86,6 @@ export interface Database {
           id?: string;
           name: string;
           slug: string;
-          late_api_key_encrypted?: string | null;
-          ai_api_key?: string | null;
           ai_provider?: string;
           global_keywords?: Json | null;
           created_at?: string;
@@ -99,8 +95,6 @@ export interface Database {
           id?: string;
           name?: string;
           slug?: string;
-          late_api_key_encrypted?: string | null;
-          ai_api_key?: string | null;
           ai_provider?: string;
           global_keywords?: Json | null;
           updated_at?: string;
@@ -143,7 +137,6 @@ export interface Database {
           display_name: string | null;
           profile_picture: string | null;
           webhook_id: string | null;
-          webhook_secret: string | null;
           is_active: boolean;
           last_comment_cursor: string | null;
           comment_rules: Json | null;
@@ -159,7 +152,6 @@ export interface Database {
           display_name?: string | null;
           profile_picture?: string | null;
           webhook_id?: string | null;
-          webhook_secret?: string | null;
           is_active?: boolean;
           last_comment_cursor?: string | null;
           comment_rules?: Json | null;
@@ -173,7 +165,6 @@ export interface Database {
           display_name?: string | null;
           profile_picture?: string | null;
           webhook_id?: string | null;
-          webhook_secret?: string | null;
           is_active?: boolean;
           last_comment_cursor?: string | null;
           comment_rules?: Json | null;

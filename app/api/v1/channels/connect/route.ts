@@ -25,8 +25,8 @@ async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) 
 /**
  * POST /api/v1/channels/connect
  *
- * Returns Zernio's OAuth/connect URL for the given platform.
- * Zernio handles the entire connection flow (OAuth, page selection, etc.)
+ * Returns the configured social gateway connection URL for the given platform.
+ * The configured gateway handles the connection flow (OAuth, page selection, etc.)
  * and redirects back to our callback URL when done.
  */
 export async function POST(request: NextRequest) {
@@ -35,12 +35,6 @@ export async function POST(request: NextRequest) {
   if (!workspace)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!workspace.late_api_key_encrypted) {
-    return NextResponse.json(
-      { error: "Zernio API key not configured. Go to Settings first." },
-      { status: 400 }
-    );
-  }
 
   const { platform } = await request.json();
 
@@ -52,15 +46,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient();
 
   try {
-    // Get profile ID (required by Zernio's connect endpoint)
+    // Resolve the gateway profile scope
     const profilesRes = await gateway.profiles.list();
     const profiles = profilesRes.data?.profiles ?? [];
     if (profiles.length === 0) {
       return NextResponse.json(
-        { error: "No Zernio profiles found. Create one in your Zernio dashboard first." },
+        { error: "No social gateway profile is available." },
         { status: 400 }
       );
     }
@@ -69,7 +63,7 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const callbackUrl = `${appUrl}/dashboard/channels/callback`;
 
-    // Zernio handles everything: OAuth, page selection, Bluesky credentials, Telegram code
+    // The gateway handles provider-specific authorization and account selection
     const res = await gateway.connections.getConnectUrl({
       platform: platform as GatewayPlatform,
       profileId,
