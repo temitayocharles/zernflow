@@ -62,7 +62,10 @@ export async function ensureWebhookRegistered(
   }
 
   const eventsOk = opts.events.every((e) => mine.events?.includes(e));
-  const secretOk = (mine.secret || "") === opts.secret;
+  // The self-hosted gateway stores only a fingerprint and deliberately omits
+  // webhook secrets from reads. Compare secrets only when the backend is able
+  // to return one (the temporary hosted compatibility adapter does).
+  const secretOk = mine.secret == null || mine.secret === opts.secret;
   if (mine.url !== url || !eventsOk || !secretOk) {
     if (!mine._id) throw new Error('Gateway webhook is missing its identifier');
     const updated = await gateway.webhooks.update({

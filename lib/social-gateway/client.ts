@@ -29,7 +29,7 @@ export interface GatewayWebhook {
   _id?: string;
   name?: string;
   url?: string;
-  secret?: string;
+  secret?: string | null;
   events?: string[];
 }
 
