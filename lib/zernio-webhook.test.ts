@@ -52,7 +52,7 @@ function fakeZernio(existing: Array<Record<string, unknown>>) {
   const update = vi.fn().mockResolvedValue({ data: { success: true } });
   const get = vi.fn().mockResolvedValue({ data: { webhooks: existing } });
   return {
-    client: { webhooks: { getWebhookSettings: get, createWebhookSettings: create, updateWebhookSettings: update } },
+    client: { webhooks: { list: get, create, update } },
     get,
     create,
     update,
@@ -75,12 +75,10 @@ describe("ensureWebhookRegistered", () => {
     expect(res.action).toBe("created");
     expect(z.create).toHaveBeenCalledTimes(1);
     expect(z.create).toHaveBeenCalledWith({
-      body: {
-        name: WEBHOOK_NAME,
-        url: EXPECTED_URL,
-        secret: "s3cr3t",
-        events: ["message.received", "comment.received"],
-      },
+      name: WEBHOOK_NAME,
+      url: EXPECTED_URL,
+      secret: "s3cr3t",
+      events: ["message.received", "comment.received"],
     });
     expect(z.update).not.toHaveBeenCalled();
   });
@@ -107,13 +105,11 @@ describe("ensureWebhookRegistered", () => {
     expect(res.action).toBe("updated");
     expect(z.update).toHaveBeenCalledTimes(1);
     expect(z.update).toHaveBeenCalledWith({
-      body: {
-        _id: "wh1",
-        name: WEBHOOK_NAME,
-        url: EXPECTED_URL,
-        secret: "s3cr3t",
-        events: ["message.received", "comment.received"],
-      },
+      id: "wh1",
+      name: WEBHOOK_NAME,
+      url: EXPECTED_URL,
+      secret: "s3cr3t",
+      events: ["message.received", "comment.received"],
     });
     expect(z.create).not.toHaveBeenCalled();
   });
@@ -127,13 +123,11 @@ describe("ensureWebhookRegistered", () => {
 
     expect(res.action).toBe("updated");
     expect(z.update).toHaveBeenCalledWith({
-      body: {
-        _id: "wh1",
-        name: WEBHOOK_NAME,
-        url: EXPECTED_URL,
-        secret: "s3cr3t",
-        events: ["message.received", "comment.received"],
-      },
+      id: "wh1",
+      name: WEBHOOK_NAME,
+      url: EXPECTED_URL,
+      secret: "s3cr3t",
+      events: ["message.received", "comment.received"],
     });
   });
 
@@ -157,12 +151,10 @@ describe("ensureWebhookRegistered", () => {
     );
 
     expect(z.create).toHaveBeenCalledWith({
-      body: {
-        name: WEBHOOK_NAME,
-        url: EXPECTED_URL,
-        secret: "s3cr3t",
-        events: ["message.received", "comment.received"],
-      },
+      name: WEBHOOK_NAME,
+      url: EXPECTED_URL,
+      secret: "s3cr3t",
+      events: ["message.received", "comment.received"],
     });
   });
 
@@ -193,13 +185,11 @@ describe("ensureWebhookRegistered", () => {
 
     expect(res.action).toBe("updated");
     expect(z.update).toHaveBeenCalledWith({
-      body: {
-        _id: "wh9",
-        name: WEBHOOK_NAME,
-        url: EXPECTED_URL,
-        secret: "s3cr3t",
-        events: ["message.received", "comment.received"],
-      },
+      id: "wh9",
+      name: WEBHOOK_NAME,
+      url: EXPECTED_URL,
+      secret: "s3cr3t",
+      events: ["message.received", "comment.received"],
     });
     expect(z.create).not.toHaveBeenCalled();
   });

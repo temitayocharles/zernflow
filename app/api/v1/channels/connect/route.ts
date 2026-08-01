@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createZernioClient } from "@/lib/zernio-client";
+import {
+  createSocialGatewayClient,
+  type GatewayPlatform,
+} from "@/lib/social-gateway/client";
 
 async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -49,11 +52,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
 
   try {
     // Get profile ID (required by Zernio's connect endpoint)
-    const profilesRes = await zernio.profiles.listProfiles();
+    const profilesRes = await gateway.profiles.list();
     const profiles = profilesRes.data?.profiles ?? [];
     if (profiles.length === 0) {
       return NextResponse.json(
@@ -67,9 +70,10 @@ export async function POST(request: NextRequest) {
     const callbackUrl = `${appUrl}/dashboard/channels/callback`;
 
     // Zernio handles everything: OAuth, page selection, Bluesky credentials, Telegram code
-    const res = await zernio.connect.getConnectUrl({
-      path: { platform },
-      query: { profileId, redirect_url: callbackUrl },
+    const res = await gateway.connections.getConnectUrl({
+      platform: platform as GatewayPlatform,
+      profileId,
+      redirectUrl: callbackUrl,
     });
 
     if (!res.data?.authUrl) {

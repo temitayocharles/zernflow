@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import type { FlowExecutionContext, AiResponseNodeData } from "../types";
-import { createZernioClient } from "@/lib/zernio-client";
+import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 import { generateText, createGateway } from "ai";
 
 // Halt the run: continuing would let a downstream Send Message deliver the
@@ -36,7 +36,7 @@ export async function executeAiResponse(
     return cancelRun(supabase, sessionId);
   }
 
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
 
   // Resolve late_account_id from channel if not in context
   let lateAccountId = context.lateAccountId;
@@ -116,9 +116,10 @@ export async function executeAiResponse(
 
     if (data.sendDirectly !== false) {
       // Send via Zernio REST API (same pattern as executeSendMessage)
-      const response = await zernio.messages.sendInboxMessage({
-        path: { conversationId: lateConversationId },
-        body: { accountId: lateAccountId, message: text },
+      const response = await gateway.conversations.send({
+        conversationId: lateConversationId,
+        accountId: lateAccountId,
+        message: text,
       });
 
       // Store outbound message

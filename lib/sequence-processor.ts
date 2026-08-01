@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { createZernioClient } from "@/lib/zernio-client";
+import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 import type { SequenceStep } from "@/lib/types/database";
 
 /**
@@ -153,7 +153,7 @@ async function sendSequenceMessage(
     return;
   }
 
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
 
   // Get channel's late_account_id
   const { data: channel } = await supabase
@@ -186,9 +186,10 @@ async function sendSequenceMessage(
   }
 
   try {
-    const response = await zernio.messages.sendInboxMessage({
-      path: { conversationId: conversation.late_conversation_id },
-      body: { accountId: channel.late_account_id, message: text },
+    const response = await gateway.conversations.send({
+      conversationId: conversation.late_conversation_id,
+      accountId: channel.late_account_id,
+      message: text,
     });
 
     // Store outbound message

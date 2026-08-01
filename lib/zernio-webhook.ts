@@ -9,7 +9,7 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Zernio } from "./zernio-client";
+import type { GatewayWebhook, SocialGatewayClient } from "./social-gateway/client";
 
 /** Name used to identify Zernflow's webhook among a profile's webhooks. */
 export const WEBHOOK_NAME = "Zernflow";
@@ -28,15 +28,6 @@ export interface EnsureWebhookOptions {
 
 export interface EnsureWebhookResult {
   action: "created" | "updated" | "unchanged";
-}
-
-/** Minimal shape of a Zernio webhook entry (subset of the SDK's Webhook type). */
-interface ZernioWebhook {
-  _id?: string;
-  name?: string;
-  url?: string;
-  secret?: string;
-  events?: string[];
 }
 
 function webhookUrl(appUrl: string): string {
@@ -75,18 +66,21 @@ function samePath(a: string | undefined, b: string): boolean {
  * rewriting it would silently break that integration.
  */
 export async function ensureWebhookRegistered(
-  zernio: Zernio,
+  gateway: SocialGatewayClient,
   opts: EnsureWebhookOptions,
 ): Promise<EnsureWebhookResult> {
   const url = webhookUrl(opts.appUrl);
 
-  const res = await zernio.webhooks.getWebhookSettings();
-  const webhooks = (res?.data?.webhooks ?? []) as ZernioWebhook[];
+  const res = await gateway.webhooks.list();
+  const webhooks = (res.data?.webhooks ?? []) as GatewayWebhook[];
   const mine = webhooks.find((w) => samePath(w.url, url) || w.name === WEBHOOK_NAME);
 
   if (!mine) {
-    await zernio.webhooks.createWebhookSettings({
-      body: { name: WEBHOOK_NAME, url, secret: opts.secret, events: opts.events },
+    await gateway.webhooks.create({
+      name: WEBHOOK_NAME,
+      url,
+      secret: opts.secret,
+      events: opts.events,
     });
     return { action: "created" };
   }
@@ -98,8 +92,12 @@ export async function ensureWebhookRegistered(
   // delivery fails signature verification from then on.
   const secretOk = (mine.secret || "") === opts.secret;
   if (mine.url !== url || !eventsOk || !secretOk) {
-    await zernio.webhooks.updateWebhookSettings({
-      body: { _id: mine._id!, name: WEBHOOK_NAME, url, secret: opts.secret, events: opts.events },
+    await gateway.webhooks.update({
+      id: mine._id!,
+      name: WEBHOOK_NAME,
+      url,
+      secret: opts.secret,
+      events: opts.events,
     });
     return { action: "updated" };
   }

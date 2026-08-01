@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createZernioClient } from "@/lib/zernio-client";
+import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 
 async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -47,13 +47,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
 
   if (workspace.late_api_key_encrypted) {
-    const zernio = createZernioClient(workspace.late_api_key_encrypted);
+    const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
     try {
-      const res = await zernio.accounts.deleteAccount({
-        path: { accountId: channel.late_account_id },
+      const res = await gateway.accounts.disconnect({
+        accountId: channel.late_account_id,
       });
       // A 404 means the account is already gone from Zernio; that's fine.
-      if (res.error && res.response?.status !== 404) {
+      if (res.error && res.status !== 404) {
         return NextResponse.json(
           { error: `Failed to disconnect on Zernio: ${JSON.stringify(res.error)}` },
           { status: 502 }

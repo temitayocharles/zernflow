@@ -556,8 +556,8 @@ async function processJob(
 
       if (!workspace?.late_api_key_encrypted) return;
 
-      const { createZernioClient } = await import("@/lib/zernio-client");
-      const zernio = createZernioClient(workspace.late_api_key_encrypted);
+      const { createSocialGatewayClient } = await import("@/lib/social-gateway/client");
+      const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
 
       const channel = recipient.channels as { late_account_id: string } | null;
       if (!channel) return;
@@ -594,9 +594,10 @@ async function processJob(
       if (!sendClaim || sendClaim.length === 0) return;
 
       try {
-        await zernio.messages.sendInboxMessage({
-          path: { conversationId: conv.late_conversation_id },
-          body: { accountId: channel.late_account_id, message: messageContent?.text || "" },
+        await gateway.conversations.send({
+          conversationId: conv.late_conversation_id,
+          accountId: channel.late_account_id,
+          message: messageContent?.text || "",
         });
 
         await supabase

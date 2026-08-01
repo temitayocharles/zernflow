@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createZernioClient } from "@/lib/zernio-client";
+import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 import {
   ensureWebhookRegistered,
   getOrCreateWorkspaceWebhookSecret,
@@ -44,10 +44,10 @@ export async function POST() {
     );
   }
 
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  const gateway = createSocialGatewayClient(workspace.late_api_key_encrypted);
 
   try {
-    const res = await zernio.accounts.listAccounts();
+    const res = await gateway.accounts.list();
     const lateAccounts = res.data?.accounts ?? [];
 
     // Get existing channels for this workspace
@@ -120,7 +120,7 @@ export async function POST() {
     // Best-effort: a failure must not block the channel sync.
     try {
       const secret = await getOrCreateWorkspaceWebhookSecret(supabase, workspace.id);
-      await ensureWebhookRegistered(zernio, {
+      await ensureWebhookRegistered(gateway, {
         appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
         secret,
         events: ["message.received", "comment.received"],
@@ -140,7 +140,7 @@ export async function POST() {
 
       const { imported } = await backfillInboxConversations({
         supabase,
-        zernio,
+        gateway,
         workspaceId: workspace.id,
         channels: activeChannels ?? [],
       });
