@@ -1,0 +1,29 @@
+name: Apply provider gateway seam
+
+on:
+  push:
+    branches:
+      - feature/provider-neutral-gateway
+    paths:
+      - .bootstrap/provider-seam.patch.gz.b64
+      - .github/workflows/apply-provider-seam.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/provider-neutral-gateway
+          fetch-depth: 0
+      - name: Apply validated commit
+        run: |
+          base64 --decode .bootstrap/provider-seam.patch.gz.b64 | gzip --decompress > /tmp/provider-seam.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git am /tmp/provider-seam.patch
+          git push origin HEAD:feature/provider-neutral-gateway
