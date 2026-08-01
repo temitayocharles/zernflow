@@ -61,6 +61,26 @@ describe("ensureWebhookRegistered", () => {
     expect(z.update).not.toHaveBeenCalled();
   });
 
+  it("does not rotate endlessly when the self-hosted gateway redacts the secret", async () => {
+    const z = fakeZernio([
+      {
+        _id: "wh1",
+        name: WEBHOOK_NAME,
+        url: EXPECTED_URL,
+        secret: null,
+        events: ["message.received", "comment.received"],
+      },
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await ensureWebhookRegistered(z.client as any, {
+      ...opts,
+      events: [...opts.events],
+    });
+
+    expect(res.action).toBe("unchanged");
+    expect(z.update).not.toHaveBeenCalled();
+  });
+
   it("updates when the url is stale (AC3)", async () => {
     const z = fakeZernio([
       { _id: "wh1", name: WEBHOOK_NAME, url: "https://old.example/api/webhooks/late", events: ["message.received", "comment.received"] },
