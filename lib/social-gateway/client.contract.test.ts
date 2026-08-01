@@ -45,7 +45,9 @@ describe("AgentSocialGatewayHttpAdapter endpoint contract", () => {
   });
 
   it("lists, reads and sends conversation messages through account-scoped routes", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: [] }));
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(jsonResponse({ data: [] })));
     vi.stubGlobal("fetch", fetchMock);
     const client = createClient();
 
@@ -103,7 +105,9 @@ describe("AgentSocialGatewayHttpAdapter endpoint contract", () => {
   });
 
   it("routes public and private comment replies with the gateway payload contract", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: {} }));
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(jsonResponse({ data: {} })));
     vi.stubGlobal("fetch", fetchMock);
     const client = createClient();
 
@@ -137,8 +141,10 @@ describe("AgentSocialGatewayHttpAdapter endpoint contract", () => {
   });
 
   it("creates and updates delivery webhooks without exposing their secret in responses", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({ _id: "webhook-1", secret: null, events: ["message.created"] }),
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({ _id: "webhook-1", secret: null, events: ["message.created"] }),
+      ),
     );
     vi.stubGlobal("fetch", fetchMock);
     const client = createClient();
