@@ -1,3 +1,4 @@
+import type { Platform } from "@/lib/types/database";
 import type {
   GatewayConversationDetail,
   GatewayConversationSummary,
@@ -7,7 +8,7 @@ import type {
 export interface ConversationProjectionChannel {
   id: string;
   gatewayAccountId: string;
-  platform: string;
+  platform: Platform;
 }
 
 export interface ExistingConversationProjection {
@@ -33,7 +34,7 @@ export interface ConversationProjectionInput {
 export interface ConversationCreatePlan {
   gatewayConversationId: string;
   channelId: string;
-  platform: string;
+  platform: Platform;
   participant: GatewayParticipant;
   existingContactId: string | null;
   lastMessageAt: string;
