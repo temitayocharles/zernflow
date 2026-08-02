@@ -211,6 +211,7 @@ export interface ReplyInput {
   text?: string;
   attachments?: GatewayReplyAttachmentInput[];
   presentation?: GatewayReplyPresentationInput;
+  deliveryMode?: "conversation" | "private_comment_reply";
   idempotencyKey: string;
   replyToMessageId?: string;
 }
