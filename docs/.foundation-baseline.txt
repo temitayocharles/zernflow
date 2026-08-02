@@ -1,0 +1,208 @@
+# ZernFlow Foundation Baseline
+
+commit=24aecd2b46e0da07ea02ed725974e44db5b148c6
+node=v22.23.2
+npm=10.9.8
+npm_ci=0
+lint=0
+typecheck=0
+test=0
+build=0
+hosted_dependency_matches=322
+secret_field_matches=76
+
+## npm_ci tail
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: '@icons-pack/react-simple-icons@13.11.2',
+npm warn EBADENGINE   required: { node: '>=24', pnpm: '>=10' },
+npm warn EBADENGINE   current: { node: 'v22.23.2', npm: '10.9.8' }
+npm warn EBADENGINE }
+
+added 462 packages in 16s
+
+## lint tail
+
+> zernflow@0.1.0 lint
+> eslint .
+
+
+/workspace/temitayocharles/zernflow/app/(dashboard)/dashboard/analytics/analytics-view.tsx
+  224:6  warning  React Hook useEffect has missing dependencies: 'fetchAnalytics', 'initialData.contactGrowth', 'initialData.flowPerformance', 'initialData.messageVolume', and 'initialData.stats'. Either include them or remove the dependency array. If 'setStats' needs the current value of 'initialData.stats', you can also switch to useReducer instead of useState and read 'initialData.stats' in the reducer  react-hooks/exhaustive-deps
+
+/workspace/temitayocharles/zernflow/app/(dashboard)/dashboard/inbox/inbox-view.tsx
+  96:6  warning  React Hook useEffect has a missing dependency: 'selected'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/workspace/temitayocharles/zernflow/components/flow-builder/flow-canvas.tsx
+  282:6  warning  React Hook useCallback has a missing dependency: 'router'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/workspace/temitayocharles/zernflow/components/flow-builder/panels/ActionPanel.tsx
+  139:9  warning  The 'headers' logical expression could make the dependencies of useCallback Hook (at line 144) change on every render. To fix this, wrap the initialization of 'headers' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  139:9  warning  The 'headers' logical expression could make the dependencies of useCallback Hook (at line 154) change on every render. To fix this, wrap the initialization of 'headers' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  139:9  warning  The 'headers' logical expression could make the dependencies of useCallback Hook (at line 161) change on every render. To fix this, wrap the initialization of 'headers' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  139:9  warning  The 'headers' logical expression could make the dependencies of useCallback Hook (at line 170) change on every render. To fix this, wrap the initialization of 'headers' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  388:9  warning  The 'paths' logical expression could make the dependencies of useCallback Hook (at line 401) change on every render. To fix this, wrap the initialization of 'paths' in its own useMemo() Hook      react-hooks/exhaustive-deps
+  388:9  warning  The 'paths' logical expression could make the dependencies of useCallback Hook (at line 406) change on every render. To fix this, wrap the initialization of 'paths' in its own useMemo() Hook      react-hooks/exhaustive-deps
+  388:9  warning  The 'paths' logical expression could make the dependencies of useCallback Hook (at line 413) change on every render. To fix this, wrap the initialization of 'paths' in its own useMemo() Hook      react-hooks/exhaustive-deps
+  388:9  warning  The 'paths' logical expression could make the dependencies of useCallback Hook (at line 424) change on every render. To fix this, wrap the initialization of 'paths' in its own useMemo() Hook      react-hooks/exhaustive-deps
+
+/workspace/temitayocharles/zernflow/components/flow-builder/panels/ConditionPanel.tsx
+  44:9  warning  The 'conditions' logical expression could make the dependencies of useCallback Hook (at line 52) change on every render. To fix this, wrap the initialization of 'conditions' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  44:9  warning  The 'conditions' logical expression could make the dependencies of useCallback Hook (at line 60) change on every render. To fix this, wrap the initialization of 'conditions' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  44:9  warning  The 'conditions' logical expression could make the dependencies of useCallback Hook (at line 67) change on every render. To fix this, wrap the initialization of 'conditions' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/workspace/temitayocharles/zernflow/components/flow-builder/panels/SendMessagePanel.tsx
+   84:9   warning  The 'messages' logical expression could make the dependencies of useCallback Hook (at line 92) change on every render. To fix this, wrap the initialization of 'messages' in its own useMemo() Hook   react-hooks/exhaustive-deps
+   84:9   warning  The 'messages' logical expression could make the dependencies of useCallback Hook (at line 97) change on every render. To fix this, wrap the initialization of 'messages' in its own useMemo() Hook   react-hooks/exhaustive-deps
+   84:9   warning  The 'messages' logical expression could make the dependencies of useCallback Hook (at line 103) change on every render. To fix this, wrap the initialization of 'messages' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  336:17  warning  Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                           jsx-a11y/alt-text
+  511:9   warning  The 'elements' logical expression could make the dependencies of useCallback Hook (at line 517) change on every render. To fix this, wrap the initialization of 'elements' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  511:9   warning  The 'elements' logical expression could make the dependencies of useCallback Hook (at line 525) change on every render. To fix this, wrap the initialization of 'elements' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  511:9   warning  The 'elements' logical expression could make the dependencies of useCallback Hook (at line 532) change on every render. To fix this, wrap the initialization of 'elements' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  587:9   warning  The 'buttons' logical expression could make the dependencies of useCallback Hook (at line 595) change on every render. To fix this, wrap the initialization of 'buttons' in its own useMemo() Hook    react-hooks/exhaustive-deps
+  587:9   warning  The 'buttons' logical expression could make the dependencies of useCallback Hook (at line 603) change on every render. To fix this, wrap the initialization of 'buttons' in its own useMemo() Hook    react-hooks/exhaustive-deps
+  587:9   warning  The 'buttons' logical expression could make the dependencies of useCallback Hook (at line 611) change on every render. To fix this, wrap the initialization of 'buttons' in its own useMemo() Hook    react-hooks/exhaustive-deps
+  636:13  warning  Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                           jsx-a11y/alt-text
+
+/workspace/temitayocharles/zernflow/components/flow-builder/panels/TriggerPanel.tsx
+  43:9  warning  The 'keywords' logical expression could make the dependencies of useCallback Hook (at line 60) change on every render. To fix this, wrap the initialization of 'keywords' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  43:9  warning  The 'keywords' logical expression could make the dependencies of useCallback Hook (at line 67) change on every render. To fix this, wrap the initialization of 'keywords' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  43:9  warning  The 'keywords' logical expression could make the dependencies of useCallback Hook (at line 75) change on every render. To fix this, wrap the initialization of 'keywords' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/workspace/temitayocharles/zernflow/components/inbox/contact-panel.tsx
+  139:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/workspace/temitayocharles/zernflow/components/inbox/conversation-list.tsx
+  176:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/workspace/temitayocharles/zernflow/components/inbox/message-thread.tsx
+  203:6   warning  React Hook useEffect has a missing dependency: 'conversation'. Either include it or remove the dependency array                                                                                                                                                                          react-hooks/exhaustive-deps
+  284:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/workspace/temitayocharles/zernflow/components/workspace-switcher.tsx
+   85:9   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  119:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/workspace/temitayocharles/zernflow/lib/zernio-webhook.test.ts
+   72:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+   92:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  104:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  125:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  144:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  154:7  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  174:7  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  191:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  216:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  229:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  246:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+✖ 45 problems (0 errors, 45 warnings)
+  0 errors and 11 warnings potentially fixable with the `--fix` option.
+
+
+## typecheck tail
+
+## test tail
+
+> zernflow@0.1.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/workspace/temitayocharles/zernflow[39m
+
+[90mstderr[2m | lib/inbox-sync.test.ts[2m > [22m[2mbackfillInboxConversations[2m > [22m[2mcontinues with the next channel when one channel's listing fails
+[22m[39m[inbox-sync] backfill failed for channel ch-bad (facebook): Error: account disconnected
+    at [90m/workspace/temitayocharles/zernflow/[39mlib/inbox-sync.test.ts:364:30
+    at [90mfile:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:155:11
+    at [90mfile:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:752:26
+    at [90mfile:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1863:10[90m)[39m
+    at runTest [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1574:12[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+    at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
+    at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
+
+ [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m lib/comment-processor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m39 passed[39m[22m[90m (39)[39m
+[2m   Start at [22m 08:32:47
+[2m   Duration [22m 693ms[2m (transform 242ms, setup 0ms, collect 492ms, tests 51ms, environment 1ms, prepare 374ms)[22m
+
+
+## build tail
+
+> zernflow@0.1.0 build
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.1.6 (Turbopack)
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.8s
+  Running TypeScript ...
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/32) ...
+  Generating static pages using 5 workers (8/32) 
+  Generating static pages using 5 workers (16/32) 
+  Generating static pages using 5 workers (24/32) 
+✓ Generating static pages using 5 workers (32/32) in 324.1ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/cron/jobs
+├ ƒ /api/cron/sequences
+├ ƒ /api/v1/broadcasts
+├ ƒ /api/v1/broadcasts/[broadcastId]/send
+├ ƒ /api/v1/channels
+├ ƒ /api/v1/channels/[channelId]
+├ ƒ /api/v1/channels/connect
+├ ƒ /api/v1/channels/sync
+├ ƒ /api/v1/channels/test-key
+├ ƒ /api/v1/contacts
+├ ƒ /api/v1/flows
+├ ƒ /api/v1/flows/[flowId]
+├ ƒ /api/v1/flows/[flowId]/publish
+├ ƒ /api/v1/flows/[flowId]/versions
+├ ƒ /api/v1/flows/[flowId]/versions/[versionId]/restore
+├ ƒ /api/v1/messages
+├ ƒ /api/webhooks/late
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/analytics
+├ ƒ /dashboard/broadcasts
+├ ƒ /dashboard/channels
+├ ƒ /dashboard/channels/callback
+├ ƒ /dashboard/contacts
+├ ƒ /dashboard/contacts/[contactId]
+├ ƒ /dashboard/flows
+├ ƒ /dashboard/flows/[flowId]
+├ ƒ /dashboard/flows/templates
+├ ƒ /dashboard/growth
+├ ƒ /dashboard/inbox
+├ ƒ /dashboard/sequences
+├ ƒ /dashboard/sequences/[sequenceId]
+├ ƒ /dashboard/settings
+├ ƒ /dashboard/settings/team
+├ ƒ /invite/[inviteId]
+├ ○ /login
+├ ○ /register
+├ ○ /robots.txt
+└ ○ /sitemap.xml
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
