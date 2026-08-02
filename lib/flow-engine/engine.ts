@@ -18,8 +18,8 @@ import type {
   EnrollSequenceNodeData,
 } from "./types";
 import { executeAiResponse } from "./nodes/ai-response";
-import { adaptMessage } from "./platform-adapter";
-import { createZernioClient } from "@/lib/zernio-client";
+import { buildGatewayFlowReply } from "./gateway-message";
+import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 
 export async function executeFlow(
   supabase: SupabaseClient<Database>,
