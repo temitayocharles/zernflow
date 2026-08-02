@@ -333,7 +333,13 @@ async function executeNode(
 ): Promise<string | void> {
   switch (node.type) {
     case "sendMessage":
-      return executeSendMessage(supabase, node.data as SendMessageNodeData, context);
+      return executeSendMessage(
+        supabase,
+        node.data as SendMessageNodeData,
+        context,
+        sessionId,
+        node.id,
+      );
     case "condition":
       return executeCondition(supabase, node.data as ConditionNodeData, context);
     case "delay":
