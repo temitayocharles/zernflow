@@ -1,6 +1,6 @@
 # ZernFlow Foundation Baseline
 
-commit=48d1642df252509df370d3e7b2944614ec34cc7f
+commit=8ddcf19617037cbe54e25bae45d988683c76f039
 node=v22.23.2
 npm=10.9.8
 npm_ci=0
@@ -8,7 +8,7 @@ lint=0
 typecheck=2
 test=0
 build=1
-hosted_dependency_matches=327
+hosted_dependency_matches=340
 secret_field_matches=63
 
 ## npm_ci tail
@@ -105,7 +105,7 @@ added 462 packages in 14s
 
 
 ## typecheck tail
-app/api/v1/conversations/sync/route.ts(165,81): error TS2769: No overload matches this call.
+app/api/v1/conversations/sync/route.ts(306,62): error TS2769: No overload matches this call.
   Overload 1 of 2, '(values: { id?: string | undefined; workspace_id: string; channel_id: string; contact_id: string; late_conversation_id?: string | null | undefined; platform: Platform; status?: ConversationStatus | undefined; ... 6 more ...; updated_at?: string | undefined; }, options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
     Type 'string' is not assignable to type 'Platform'.
   Overload 2 of 2, '(values: { id?: string | undefined; workspace_id: string; channel_id: string; contact_id: string; late_conversation_id?: string | null | undefined; platform: Platform; status?: ConversationStatus | undefined; ... 6 more ...; updated_at?: string | undefined; }[], options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
@@ -119,7 +119,10 @@ app/api/v1/conversations/sync/route.ts(165,81): error TS2769: No overload matche
 
 [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/workspace/temitayocharles/zernflow[39m
 
- [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 23[2mms[22m[39m
 [90mstderr[2m | lib/inbox-sync.test.ts[2m > [22m[2mbackfillInboxConversations[2m > [22m[2mcontinues with the next channel when one channel's listing fails
 [22m[39m[inbox-sync] backfill failed for channel ch-bad (facebook): Error: account disconnected
     at [90m/workspace/temitayocharles/zernflow/[39mlib/inbox-sync.test.ts:364:30
@@ -133,17 +136,15 @@ app/api/v1/conversations/sync/route.ts(165,81): error TS2769: No overload matche
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
 
- [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 31[2mms[22m[39m
- [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 20[2mms[22m[39m
- [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 34[2mms[22m[39m
  [32m✓[39m lib/zernio-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m lib/concurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
  [32m✓[39m lib/comment-processor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
 
-[2m Test Files [22m [1m[32m7 passed[39m[22m[90m (7)[39m
-[2m      Tests [22m [1m[32m58 passed[39m[22m[90m (58)[39m
-[2m   Start at [22m 18:35:12
-[2m   Duration [22m 1.02s[2m (transform 396ms, setup 0ms, collect 792ms, tests 90ms, environment 2ms, prepare 858ms)[22m
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m61 passed[39m[22m[90m (61)[39m
+[2m   Start at [22m 18:46:54
+[2m   Duration [22m 1.04s[2m (transform 589ms, setup 0ms, collect 916ms, tests 108ms, environment 2ms, prepare 965ms)[22m
 
 
 ## build tail
@@ -161,22 +162,22 @@ https://nextjs.org/telemetry
 
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
   Creating an optimized production build ...
-✓ Compiled successfully in 6.4s
+✓ Compiled successfully in 6.8s
   Running TypeScript ...
 Failed to compile.
 
-./app/api/v1/conversations/sync/route.ts:165:81
+./app/api/v1/conversations/sync/route.ts:306:62
 Type error: No overload matches this call.
   Overload 1 of 2, '(values: { id?: string | undefined; workspace_id: string; channel_id: string; contact_id: string; late_conversation_id?: string | null | undefined; platform: Platform; status?: ConversationStatus | undefined; ... 6 more ...; updated_at?: string | undefined; }, options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
     Type 'string' is not assignable to type 'Platform'.
   Overload 2 of 2, '(values: { id?: string | undefined; workspace_id: string; channel_id: string; contact_id: string; late_conversation_id?: string | null | undefined; platform: Platform; status?: ConversationStatus | undefined; ... 6 more ...; updated_at?: string | undefined; }[], options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
     Object literal may only specify known properties, and 'workspace_id' does not exist in type '{ id?: string | undefined; workspace_id: string; channel_id: string; contact_id: string; late_conversation_id?: string | null | undefined; platform: Platform; status?: ConversationStatus | undefined; ... 6 more ...; updated_at?: string | undefined; }[]'.
 
-[0m [90m 163 |[39m       }
- [90m 164 |[39m
-[31m[1m>[22m[39m[90m 165 |[39m       [36mconst[39m { error[33m:[39m conversationError } [33m=[39m [36mawait[39m supabase[33m.[39m[36mfrom[39m([32m"conversations"[39m)[33m.[39minsert({
- [90m     |[39m                                                                                 [31m[1m^[22m[39m
- [90m 166 |[39m         workspace_id[33m:[39m workspace[33m.[39mid[33m,[39m
- [90m 167 |[39m         channel_id[33m:[39m item[33m.[39mchannelId[33m,[39m
- [90m 168 |[39m         contact_id[33m:[39m contactId[33m,[39m[0m
+[0m [90m 304 |[39m         item[33m,[39m
+ [90m 305 |[39m       )[33m;[39m
+[31m[1m>[22m[39m[90m 306 |[39m       [36mconst[39m { error } [33m=[39m [36mawait[39m supabase[33m.[39m[36mfrom[39m([32m"conversations"[39m)[33m.[39mupsert(
+ [90m     |[39m                                                              [31m[1m^[22m[39m
+ [90m 307 |[39m         {
+ [90m 308 |[39m           workspace_id[33m:[39m workspace[33m.[39mid[33m,[39m
+ [90m 309 |[39m           channel_id[33m:[39m item[33m.[39mchannelId[33m,[39m[0m
 Next.js build worker exited with code: 1 and signal: null
