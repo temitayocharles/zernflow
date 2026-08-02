@@ -1,0 +1,224 @@
+name: Migrate Comment Replies
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ["forgejo-general"]
+    container:
+      image: python:3.13-bookworm
+    steps:
+      - name: Fetch branch
+        shell: sh
+        run: |
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends git
+          git config --global --add safe.directory "$PWD"
+          git init .
+          git remote add origin "${FORGEJO_SERVER_URL:-${GITHUB_SERVER_URL}}/${FORGEJO_REPOSITORY:-${GITHUB_REPOSITORY}}.git"
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "${token}"
+          git -c http.extraHeader="Authorization: token ${token}" fetch --depth=1 origin refs/heads/feature/foundation-gateway-seam
+          git checkout -B feature/foundation-gateway-seam FETCH_HEAD
+
+      - name: Replace hosted comment delivery
+        shell: sh
+        run: |
+          set -eu
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("lib/flow-engine/engine.ts")
+          text = path.read_text()
+          start_marker = "/**\n * Post a public reply to the comment that triggered this flow."
+          end_marker = "async function completeSession("
+          start = text.find(start_marker)
+          end = text.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit("comment reply migration markers were not found")
+          replacement = '''interface GatewayCommentTarget {
+            gatewayConversationId: string;
+            gatewayMessageId: string;
+          }
+
+          async function resolveGatewayCommentTarget(
+            supabase: SupabaseClient<Database>,
+            context: FlowExecutionContext,
+          ): Promise<GatewayCommentTarget> {
+            let gatewayConversationId = context.lateConversationId;
+            if (!gatewayConversationId) {
+              const { data: conversation, error } = await supabase
+                .from("conversations")
+                .select("late_conversation_id")
+                .eq("id", context.conversationId)
+                .eq("workspace_id", context.workspaceId)
+                .single();
+              if (error) throw new Error(error.message);
+              gatewayConversationId = conversation?.late_conversation_id ?? undefined;
+            }
+            if (!gatewayConversationId) {
+              throw new Error(
+                `No Agent Social Gateway conversation ID is projected for ${context.conversationId}`,
+              );
+            }
+
+            const commentRef = context.variables?.comment_id?.trim();
+            if (!commentRef) {
+              throw new Error("Comment-triggered flow is missing comment_id");
+            }
+
+            const gateway = requireSocialGatewayClient();
+            let cursor: string | undefined;
+            for (let page = 0; page < 5; page += 1) {
+              const detail = await gateway.getConversation(gatewayConversationId, {
+                messageLimit: 200,
+                ...(cursor ? { messageCursor: cursor } : {}),
+              });
+              const target = detail.messages.find(
+                (message) => message.external_message_ref === commentRef,
+              );
+              if (target) {
+                return {
+                  gatewayConversationId,
+                  gatewayMessageId: target.id,
+                };
+              }
+              cursor = detail.next_message_cursor ?? undefined;
+              if (!cursor) break;
+            }
+
+            throw new Error(
+              `Gateway comment message ${commentRef} was not found in ${gatewayConversationId}`,
+            );
+          }
+
+          async function recordCommentReplyOperation(
+            supabase: SupabaseClient<Database>,
+            context: FlowExecutionContext,
+            nodeId: string,
+            deliveryMode: "conversation" | "private_comment_reply",
+            operation: { id: string; status: string },
+          ): Promise<void> {
+            const { error } = await supabase.from("analytics_events").insert({
+              workspace_id: context.workspaceId,
+              flow_id: context.flowId,
+              contact_id: context.contactId,
+              event_type: "message_sent",
+              metadata: {
+                delivery: "durable_gateway_operation",
+                delivery_mode: deliveryMode,
+                node_id: nodeId,
+                operation_id: operation.id,
+                operation_status: operation.status,
+              },
+            });
+            if (error) {
+              console.error("[flow-engine] comment reply analytics failed", {
+                flowId: context.flowId,
+                nodeId,
+                operationId: operation.id,
+                error: error.message,
+              });
+            }
+          }
+
+          async function executeCommentReply(
+            supabase: SupabaseClient<Database>,
+            data: CommentReplyNodeData,
+            context: FlowExecutionContext,
+            sessionId: string,
+            nodeId: string,
+          ) {
+            const target = await resolveGatewayCommentTarget(supabase, context);
+            const text = interpolateVariables(data.text, context.variables ?? {}).trim();
+            if (!text) throw new Error("Public comment reply text is empty");
+
+            const gateway = requireSocialGatewayClient();
+            const operation = await gateway.replyToConversation(
+              target.gatewayConversationId,
+              {
+                text,
+                deliveryMode: "conversation",
+                replyToMessageId: target.gatewayMessageId,
+                idempotencyKey: flowReplyIdempotencyKey({
+                  workspaceId: context.workspaceId,
+                  flowId: context.flowId,
+                  sessionId,
+                  nodeId,
+                  messageIndex: 0,
+                }),
+              },
+            );
+            await recordCommentReplyOperation(
+              supabase,
+              context,
+              nodeId,
+              "conversation",
+              operation,
+            );
+          }
+
+          async function executePrivateReply(
+            supabase: SupabaseClient<Database>,
+            data: PrivateReplyNodeData,
+            context: FlowExecutionContext,
+            sessionId: string,
+            nodeId: string,
+          ) {
+            const target = await resolveGatewayCommentTarget(supabase, context);
+            const text = interpolateVariables(data.text, context.variables ?? {}).trim();
+            const imageUrl = data.imageUrl
+              ? interpolateVariables(data.imageUrl, context.variables ?? {}).trim()
+              : "";
+            if (!text && !imageUrl) {
+              throw new Error("Private comment reply has no dispatchable content");
+            }
+
+            const gateway = requireSocialGatewayClient();
+            const operation = await gateway.replyToConversation(
+              target.gatewayConversationId,
+              {
+                ...(text ? { text } : {}),
+                ...(imageUrl
+                  ? { attachments: [{ type: "image" as const, url: imageUrl }] }
+                  : {}),
+                deliveryMode: "private_comment_reply",
+                replyToMessageId: target.gatewayMessageId,
+                idempotencyKey: flowReplyIdempotencyKey({
+                  workspaceId: context.workspaceId,
+                  flowId: context.flowId,
+                  sessionId,
+                  nodeId,
+                  messageIndex: 0,
+                }),
+              },
+            );
+            await recordCommentReplyOperation(
+              supabase,
+              context,
+              nodeId,
+              "private_comment_reply",
+              operation,
+            );
+          }
+
+          '''
+          path.write_text(text[:start] + replacement + text[end:])
+          PY
+          git diff --check
+
+      - name: Commit migration
+        shell: sh
+        run: |
+          set -eu
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          git config user.name "Forgejo Comment Migration"
+          git config user.email "comment-migration@users.noreply.forgejo"
+          git add lib/flow-engine/engine.ts
+          git commit -m "refactor: route comment replies through durable gateway"
+          git -c http.extraHeader="Authorization: token ${token}" push origin HEAD:refs/heads/feature/foundation-gateway-seam
