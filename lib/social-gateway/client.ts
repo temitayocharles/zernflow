@@ -276,6 +276,13 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
     );
   }
 
+  async retryOperation(operationId: string): Promise<GatewayOperation> {
+    return this.request<GatewayOperation>(
+      `/v1/operations/${encodeURIComponent(operationId)}/retry`,
+      { auth: "operator", method: "POST" },
+    );
+  }
+
   private async reviewAction(
     requestId: string,
     action: "approve" | "reject",
