@@ -164,7 +164,12 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
     input: ListConversationsInput = {},
   ): Promise<GatewayConversationPage> {
     const url = this.url("/v1/conversations");
-    appendQuery(url, input);
+    appendQuery(url, {
+      limit: input.limit,
+      cursor: input.cursor,
+      provider: input.provider,
+      kind: input.kind,
+    });
     return this.requestUrl<GatewayConversationPage>(url, { auth: "operator" });
   }
 
