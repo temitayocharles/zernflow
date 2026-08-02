@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { FlowLoadError, resumeSession } from "@/lib/flow-engine/engine";
+import {
+  SocialGatewayError,
+} from "@/lib/social-gateway/client";
+import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 import type { Json } from "@/lib/types/database";
 
 // Signals the handler to skip retry/backoff and route straight to the
@@ -19,6 +23,15 @@ class SessionCancelError extends Error {}
 // ago. The two are indistinguishable right now, and cancelling would kill a
 // live run, so the job is requeued past the window and the next look decides.
 class SessionRecheckError extends Error {}
+
+class GatewayOperationPendingError extends Error {
+  constructor(
+    message: string,
+    readonly operationId: string | null,
+  ) {
+    super(message);
+  }
+}
 
 // An invocation that has not written anything for this long is provably dead:
 // used both to reclaim stale job claims and to age flow_sessions.updated_at.
@@ -154,7 +167,35 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
 
-      if (err instanceof SessionRecheckError) {
+      if (err instanceof GatewayOperationPendingError) {
+        const payload =
+          job.payload && typeof job.payload === "object" && !Array.isArray(job.payload)
+            ? (job.payload as Record<string, Json>)
+            : {};
+        const rawChecks = payload.operationChecks;
+        const operationChecks =
+          typeof rawChecks === "number" && Number.isFinite(rawChecks)
+            ? Math.max(0, Math.trunc(rawChecks)) + 1
+            : 1;
+        const retryDelayMs = Math.min(
+          5_000 * 2 ** Math.min(operationChecks - 1, 6),
+          5 * 60 * 1000,
+        );
+        await supabase
+          .from("scheduled_jobs")
+          .update({
+            status: "pending",
+            run_at: new Date(Date.now() + retryDelayMs).toISOString(),
+            attempts: job.attempts,
+            last_error: errorMessage,
+            payload: {
+              ...payload,
+              operationChecks,
+              ...(err.operationId ? { operationId: err.operationId } : {}),
+            } as unknown as Json,
+          })
+          .eq("id", job.id);
+      } else if (err instanceof SessionRecheckError) {
         // Requeue past the recency window and undo the claim's attempts bump:
         // a recheck is not a failure, and letting rechecks exhaust attempts
         // would route a possibly-live session into the terminal cancel below.
@@ -490,138 +531,120 @@ async function processJob(
       const payload = job.payload as {
         broadcastId: string;
         recipientId: string;
+        operationId?: string;
+        operationChecks?: number;
       };
 
-      // Process individual broadcast recipient
       const { data: recipient, error: recipientError } = await supabase
         .from("broadcast_recipients")
-        .select("*, contacts(*), channels(*), broadcasts(*)")
+        .select("*, broadcasts(message_content, workspace_id)")
         .eq("id", payload.recipientId)
         .single();
 
       if (!recipient) {
-        // Only PGRST116 (zero rows) means the recipient row is genuinely
-        // gone; a transient failure must throw so the job retries instead of
-        // dropping the send and stranding the broadcast in 'sending'.
         if (recipientError && recipientError.code !== "PGRST116") {
           throw new Error(
-            `broadcast recipient ${payload.recipientId} could not be loaded: ${recipientError.message}`
+            `broadcast recipient ${payload.recipientId} could not be loaded: ${recipientError.message}`,
           );
         }
         return;
       }
-
-      // A 'sending' row means a previous invocation of this job died between
-      // claiming the recipient and recording the outcome (the stale-claim
-      // reclaim resurrects such jobs). The message may or may not have
-      // reached the contact, so mark it failed instead of re-sending: a
-      // duplicate customer-visible message is worse than a false failure.
-      if (recipient.status === "sending") {
-        const { data: settled, error: settleError } = await supabase
-          .from("broadcast_recipients")
-          .update({
-            status: "failed",
-            error_message: "Interrupted mid-send; delivery outcome unknown",
-          })
-          .eq("id", payload.recipientId)
-          .eq("status", "sending")
-          .select();
-        if (settleError) {
-          // Unknown outcome: throw so the job retries; incrementing the
-          // failed counter now could count a recipient still stuck in
-          // 'sending', and completing the job would strand it forever.
-          throw new Error(
-            `failed to settle interrupted broadcast recipient ${payload.recipientId}: ${settleError.message}`
-          );
-        }
-        if (!settled || settled.length === 0) return; // Another run settled it
-        await supabase.rpc("increment_broadcast_failed", {
-          b_id: payload.broadcastId,
-        });
-        await settleBroadcastIfDone(supabase, payload.broadcastId);
+      if (recipient.status !== "pending" && recipient.status !== "sending") {
         return;
       }
 
-      if (recipient.status !== "pending") return;
+      const broadcast = recipient.broadcasts as {
+        message_content: { text?: string };
+        workspace_id: string;
+      } | null;
+      const message = broadcast?.message_content?.text?.trim();
+      if (!broadcast || !message) {
+        throw new Error("Broadcast message content is unavailable");
+      }
 
-      // Get workspace API key
-      const broadcast = recipient.broadcasts as { workspace_id: string } | null;
-      if (!broadcast) return;
-
-      const { data: workspace } = await supabase
-        .from("workspaces")
-        .select("late_api_key_encrypted")
-        .eq("id", broadcast.workspace_id)
-        .single();
-
-      if (!workspace?.late_api_key_encrypted) return;
-
-      const { createZernioClient } = await import("@/lib/zernio-client");
-      const zernio = createZernioClient(workspace.late_api_key_encrypted);
-
-      const channel = recipient.channels as { late_account_id: string } | null;
-      if (!channel) return;
-
-      // Get the conversation for this contact+channel (need late_conversation_id)
-      const { data: conv } = await supabase
+      const { data: conversation, error: conversationError } = await supabase
         .from("conversations")
         .select("late_conversation_id")
+        .eq("workspace_id", broadcast.workspace_id)
         .eq("contact_id", recipient.contact_id)
         .eq("channel_id", recipient.channel_id)
         .single();
-
-      if (!conv?.late_conversation_id) return;
-
-      const broadcastData = recipient.broadcasts as { message_content: { text?: string } } | null;
-      const messageContent = broadcastData?.message_content;
-
-      // CAS to 'sending' before the API call so a crash between the send and
-      // the 'sent' write cannot cause a re-send when the job is reclaimed
-      // (the 'sending' branch above settles it as failed instead).
-      const { data: sendClaim, error: sendClaimError } = await supabase
-        .from("broadcast_recipients")
-        .update({ status: "sending" })
-        .eq("id", payload.recipientId)
-        .eq("status", "pending")
-        .select();
-      if (sendClaimError) {
-        // Unknown outcome: throw so the job retries; if the CAS committed,
-        // the retry finds 'sending' and settles the recipient as failed.
+      if (conversationError || !conversation?.late_conversation_id) {
         throw new Error(
-          `failed to claim broadcast recipient ${payload.recipientId}: ${sendClaimError.message}`
+          conversationError?.message ??
+            "Agent Social Gateway conversation is not projected for broadcast recipient",
         );
       }
-      if (!sendClaim || sendClaim.length === 0) return;
 
+      const gateway = requireSocialGatewayClient();
+      let operationId = payload.operationId;
+      let operation;
       try {
-        await zernio.messages.sendInboxMessage({
-          path: { conversationId: conv.late_conversation_id },
-          body: { accountId: channel.late_account_id, message: messageContent?.text || "" },
-        });
-
-        await supabase
-          .from("broadcast_recipients")
-          .update({ status: "sent", sent_at: new Date().toISOString() })
-          .eq("id", payload.recipientId);
-
-        // Increment broadcast sent count
-        await supabase.rpc("increment_broadcast_sent", {
-          b_id: payload.broadcastId,
-        });
-      } catch (err) {
-        await supabase
-          .from("broadcast_recipients")
-          .update({
-            status: "failed",
-            error_message: err instanceof Error ? err.message : String(err),
-          })
-          .eq("id", payload.recipientId);
-
-        await supabase.rpc("increment_broadcast_failed", {
-          b_id: payload.broadcastId,
-        });
+        operation = operationId
+          ? await gateway.getOperation(operationId)
+          : await gateway.replyToConversation(
+              conversation.late_conversation_id,
+              {
+                text: message,
+                idempotencyKey: `zernflow:broadcast:${payload.recipientId}`,
+              },
+            );
+        operationId = operation.id;
+      } catch (error) {
+        if (error instanceof SocialGatewayError && error.retryable) {
+          throw new GatewayOperationPendingError(
+            "Agent Social Gateway broadcast operation is temporarily unavailable",
+            operationId ?? null,
+          );
+        }
+        throw error;
       }
 
+      if (operation.status === "pending" || operation.status === "running") {
+        const { error: sendingError } = await supabase
+          .from("broadcast_recipients")
+          .update({ status: "sending" })
+          .eq("id", payload.recipientId)
+          .in("status", ["pending", "sending"]);
+        if (sendingError) throw new Error(sendingError.message);
+        throw new GatewayOperationPendingError(
+          `Gateway operation ${operation.id} is ${operation.status}`,
+          operation.id,
+        );
+      }
+
+      const succeeded = operation.status === "succeeded";
+      const errorMessage = succeeded
+        ? null
+        : operation.error_message ??
+          (operation.status === "unknown"
+            ? "Delivery outcome is unknown"
+            : "Agent Social Gateway operation failed");
+      const { data: settled, error: settleError } = await supabase
+        .from("broadcast_recipients")
+        .update(
+          succeeded
+            ? {
+                status: "sent",
+                sent_at: new Date().toISOString(),
+                error_message: null,
+              }
+            : {
+                status: "failed",
+                error_message: errorMessage,
+              },
+        )
+        .eq("id", payload.recipientId)
+        .in("status", ["pending", "sending"])
+        .select("id");
+      if (settleError) throw new Error(settleError.message);
+
+      if (settled && settled.length > 0) {
+        await supabase.rpc(
+          succeeded ? "increment_broadcast_sent" : "increment_broadcast_failed",
+          { b_id: payload.broadcastId },
+        );
+      }
       await settleBroadcastIfDone(supabase, payload.broadcastId);
       break;
     }
