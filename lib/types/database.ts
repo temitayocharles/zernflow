@@ -59,7 +59,11 @@ export type NodeType =
   | "enrollSequence";
 
 export type SequenceStatus = "draft" | "active" | "paused";
-export type SequenceEnrollmentStatus = "active" | "completed" | "cancelled";
+export type SequenceEnrollmentStatus =
+  | "active"
+  | "completed"
+  | "cancelled"
+  | "failed";
 
 export interface SequenceStep {
   type: "message" | "delay";
@@ -1036,6 +1040,9 @@ export interface Database {
           enrolled_at: string;
           next_step_at: string | null;
           completed_at: string | null;
+          current_operation_id: string | null;
+          operation_checks: number;
+          last_error: string | null;
         };
         Insert: {
           id?: string;
@@ -1047,12 +1054,18 @@ export interface Database {
           enrolled_at?: string;
           next_step_at?: string | null;
           completed_at?: string | null;
+          current_operation_id?: string | null;
+          operation_checks?: number;
+          last_error?: string | null;
         };
         Update: {
           current_step_index?: number;
           status?: SequenceEnrollmentStatus;
           next_step_at?: string | null;
           completed_at?: string | null;
+          current_operation_id?: string | null;
+          operation_checks?: number;
+          last_error?: string | null;
         };
         Relationships: [
           {
