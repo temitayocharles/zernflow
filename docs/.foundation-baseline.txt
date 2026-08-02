@@ -1,15 +1,15 @@
 # ZernFlow Foundation Baseline
 
-commit=66796f1d94f2780ca8253b2dcc9ec2ff68b317bd
+commit=e85afecef5d46d9a6d041b8ad72c72b30d23a07b
 node=v22.23.2
 npm=10.9.8
 npm_ci=0
 lint=0
-typecheck=0
-test=0
-build=0
-hosted_dependency_matches=356
-secret_field_matches=63
+typecheck=2
+test=1
+build=1
+hosted_dependency_matches=319
+secret_field_matches=60
 
 ## npm_ci tail
 npm warn EBADENGINE Unsupported engine {
@@ -23,7 +23,7 @@ npm warn EBADENGINE   required: { node: '>=24', pnpm: '>=10' },
 npm warn EBADENGINE   current: { node: 'v22.23.2', npm: '10.9.8' }
 npm warn EBADENGINE }
 
-added 462 packages in 16s
+added 462 packages in 34s
 
 ## lint tail
 
@@ -105,6 +105,8 @@ added 462 packages in 16s
 
 
 ## typecheck tail
+lib/flow-engine/engine.ts(796,18): error TS2304: Cannot find name 'createZernioClient'.
+lib/flow-engine/engine.ts(849,18): error TS2304: Cannot find name 'createZernioClient'.
 
 ## test tail
 
@@ -114,9 +116,9 @@ added 462 packages in 16s
 
 [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/workspace/temitayocharles/zernflow[39m
 
- [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 21[2mms[22m[39m
- [32m✓[39m lib/flow-engine/gateway-message.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/rich-client.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 13[2mms[22m[39m
 [90mstderr[2m | lib/inbox-sync.test.ts[2m > [22m[2mbackfillInboxConversations[2m > [22m[2mcontinues with the next channel when one channel's listing fails
 [22m[39m[inbox-sync] backfill failed for channel ch-bad (facebook): Error: account disconnected
     at [90m/workspace/temitayocharles/zernflow/[39mlib/inbox-sync.test.ts:364:30
@@ -130,20 +132,37 @@ added 462 packages in 16s
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
 
- [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 24[2mms[22m[39m
- [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/reply.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
  [32m✓[39m lib/zernio-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m lib/social-gateway/rich-client.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m lib/social-gateway/reply.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m lib/comment-processor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m lib/concurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m lib/flow-engine/gateway-message.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m lib/concurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
 
-[2m Test Files [22m [1m[32m11 passed[39m[22m[90m (11)[39m
-[2m      Tests [22m [1m[32m68 passed[39m[22m[90m (68)[39m
-[2m   Start at [22m 19:09:26
-[2m   Duration [22m 1.20s[2m (transform 575ms, setup 0ms, collect 1.11s, tests 153ms, environment 3ms, prepare 1.42s)[22m
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
 
+[41m[1m FAIL [22m[49m lib/comment-processor.test.ts[2m [ lib/comment-processor.test.ts ][22m
+[31m[1mError[22m: Cannot find package 'server-only' imported from '/workspace/temitayocharles/zernflow/lib/social-gateway/server.ts'[39m
+[36m [2m❯[22m lib/social-gateway/server.ts:[2m1:1[22m[39m
+    [90m  1| [39m[35mimport[39m [32m"server-only"[39m[33m;[39m
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m
+    [90m  3| [39m[35mimport[39m {
+
+[31m[1mCaused by: Error[22m: Failed to load url server-only (resolved id: server-only) in /workspace/temitayocharles/zernflow/lib/social-gateway/server.ts. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m10 passed[39m[22m[90m (11)[39m
+[2m      Tests [22m [1m[32m63 passed[39m[22m[90m (63)[39m
+[2m   Start at [22m 19:25:51
+[2m   Duration [22m 1.13s[2m (transform 602ms, setup 0ms, collect 878ms, tests 120ms, environment 2ms, prepare 1.34s)[22m
+
+
+::error file=/workspace/temitayocharles/zernflow/lib/social-gateway/server.ts,title=lib/comment-processor.test.ts,line=1,column=1::Error: Cannot find package 'server-only' imported from '/workspace/temitayocharles/zernflow/lib/social-gateway/server.ts'%0A ❯ lib/social-gateway/server.ts:1:1%0A%0A⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯%0ASerialized Error: { code: 'ERR_MODULE_NOT_FOUND' }%0ACaused by: Caused by: Error: Failed to load url server-only (resolved id: server-only) in /workspace/temitayocharles/zernflow/lib/social-gateway/server.ts. Does the file exist?%0A ❯ loadAndTransform node_modules/vite/dist/node/chunks/config.js:22739:33%0A%0A
 
 ## build tail
 
@@ -160,63 +179,18 @@ https://nextjs.org/telemetry
 
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
   Creating an optimized production build ...
-✓ Compiled successfully in 6.4s
+✓ Compiled successfully in 6.2s
   Running TypeScript ...
-  Collecting page data using 5 workers ...
-  Generating static pages using 5 workers (0/33) ...
-  Generating static pages using 5 workers (8/33) 
-  Generating static pages using 5 workers (16/33) 
-  Generating static pages using 5 workers (24/33) 
-✓ Generating static pages using 5 workers (33/33) in 305.6ms
-  Finalizing page optimization ...
+Failed to compile.
 
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ƒ /api/cron/jobs
-├ ƒ /api/cron/sequences
-├ ƒ /api/v1/broadcasts
-├ ƒ /api/v1/broadcasts/[broadcastId]/send
-├ ƒ /api/v1/channels
-├ ƒ /api/v1/channels/[channelId]
-├ ƒ /api/v1/channels/connect
-├ ƒ /api/v1/channels/sync
-├ ƒ /api/v1/channels/test-key
-├ ƒ /api/v1/contacts
-├ ƒ /api/v1/conversations/sync
-├ ƒ /api/v1/flows
-├ ƒ /api/v1/flows/[flowId]
-├ ƒ /api/v1/flows/[flowId]/publish
-├ ƒ /api/v1/flows/[flowId]/versions
-├ ƒ /api/v1/flows/[flowId]/versions/[versionId]/restore
-├ ƒ /api/v1/messages
-├ ƒ /api/webhooks/late
-├ ƒ /auth/callback
-├ ƒ /dashboard
-├ ƒ /dashboard/analytics
-├ ƒ /dashboard/broadcasts
-├ ƒ /dashboard/channels
-├ ƒ /dashboard/channels/callback
-├ ƒ /dashboard/contacts
-├ ƒ /dashboard/contacts/[contactId]
-├ ƒ /dashboard/flows
-├ ƒ /dashboard/flows/[flowId]
-├ ƒ /dashboard/flows/templates
-├ ƒ /dashboard/growth
-├ ƒ /dashboard/inbox
-├ ƒ /dashboard/sequences
-├ ƒ /dashboard/sequences/[sequenceId]
-├ ƒ /dashboard/settings
-├ ƒ /dashboard/settings/team
-├ ƒ /invite/[inviteId]
-├ ○ /login
-├ ○ /register
-├ ○ /robots.txt
-└ ○ /sitemap.xml
+./lib/flow-engine/engine.ts:796:18
+Type error: Cannot find name 'createZernioClient'.
 
-
-ƒ Proxy (Middleware)
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
+[0m [90m 794 |[39m   [36mif[39m ([33m![39mworkspace[33m?[39m[33m.[39mlate_api_key_encrypted) [36mreturn[39m[33m;[39m
+ [90m 795 |[39m
+[31m[1m>[22m[39m[90m 796 |[39m   [36mconst[39m zernio [33m=[39m createZernioClient(workspace[33m.[39mlate_api_key_encrypted)[33m;[39m
+ [90m     |[39m                  [31m[1m^[22m[39m
+ [90m 797 |[39m
+ [90m 798 |[39m   [90m// Resolve late_account_id[39m
+ [90m 799 |[39m   [36mlet[39m lateAccountId [33m=[39m context[33m.[39mlateAccountId[33m;[39m[0m
+Next.js build worker exited with code: 1 and signal: null
