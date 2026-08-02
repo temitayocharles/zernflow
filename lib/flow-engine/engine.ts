@@ -18,7 +18,10 @@ import type {
   EnrollSequenceNodeData,
 } from "./types";
 import { executeAiResponse } from "./nodes/ai-response";
-import { buildGatewayFlowReply } from "./gateway-message";
+import {
+  buildGatewayFlowReply,
+  flowReplyIdempotencyKey,
+} from "./gateway-message";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 
 export async function executeFlow(
