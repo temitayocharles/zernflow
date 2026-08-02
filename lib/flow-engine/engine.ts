@@ -362,9 +362,21 @@ async function executeNode(
     case "unsubscribe":
       return executeSubscription(supabase, node.type, context);
     case "commentReply":
-      return executeCommentReply(supabase, node.data as CommentReplyNodeData, context);
+      return executeCommentReply(
+        supabase,
+        node.data as CommentReplyNodeData,
+        context,
+        sessionId,
+        node.id,
+      );
     case "privateReply":
-      return executePrivateReply(supabase, node.data as PrivateReplyNodeData, context);
+      return executePrivateReply(
+        supabase,
+        node.data as PrivateReplyNodeData,
+        context,
+        sessionId,
+        node.id,
+      );
     case "aiResponse":
       return executeAiResponse(supabase, node.data as AiResponseNodeData, context, sessionId);
     case "abSplit":
