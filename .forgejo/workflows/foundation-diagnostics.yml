@@ -1,0 +1,119 @@
+name: ZernFlow Foundation Diagnostics
+
+on:
+  push:
+    branches:
+      - feature/foundation-gateway-seam
+    paths:
+      - ".forgejo/workflows/foundation-diagnostics.yml"
+      - ".env.example"
+      - "package.json"
+      - "package-lock.json"
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "supabase/**"
+      - "next.config.ts"
+      - "tsconfig.json"
+      - "vitest.config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ["forgejo-general"]
+    container:
+      image: node:22-bookworm
+    steps:
+      - name: Prepare Git
+        shell: sh
+        run: |
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends git
+          git config --global --add safe.directory "$PWD"
+          git init .
+          git remote add origin "${FORGEJO_SERVER_URL:-${GITHUB_SERVER_URL}}/${FORGEJO_REPOSITORY:-${GITHUB_REPOSITORY}}.git"
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "${token}"
+          git -c http.extraHeader="Authorization: token ${token}" fetch --depth=1 origin refs/heads/feature/foundation-gateway-seam
+          git checkout -B feature/foundation-gateway-seam FETCH_HEAD
+
+      - name: Run and capture foundation contract
+        shell: sh
+        run: |
+          set -eu
+          mkdir -p .ci docs
+
+          run_stage() {
+            name="$1"
+            shift
+            set +e
+            "$@" > ".ci/${name}.log" 2>&1
+            code=$?
+            set -e
+            printf '%s=%s\n' "${name}" "${code}" >> .ci/status.env
+          }
+
+          : > .ci/status.env
+          run_stage npm_ci npm ci --no-audit --no-fund
+          if grep -q '^npm_ci=0$' .ci/status.env; then
+            run_stage lint npm run lint
+            run_stage typecheck npx tsc --noEmit
+            run_stage test npm test
+            set +e
+            NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=diagnostic-anon-key \
+            SUPABASE_SERVICE_ROLE_KEY=diagnostic-service-role-key \
+            CRON_SECRET=diagnostic-cron-secret-with-at-least-24-characters \
+            npm run build > .ci/build.log 2>&1
+            build_code=$?
+            set -e
+            printf 'build=%s\n' "${build_code}" >> .ci/status.env
+          else
+            printf 'lint=skipped\ntypecheck=skipped\ntest=skipped\nbuild=skipped\n' >> .ci/status.env
+          fi
+
+          grep -R -n -E '@zernio/node|zernio|ZERNIO|late_|LATE_|api\.zernio|zernio\.com' \
+            --exclude-dir=.git --exclude-dir=node_modules --exclude=package-lock.json . \
+            > docs/.hosted-dependency-inventory.txt 2>/dev/null || true
+
+          grep -R -n -E 'api_key|webhook_secret|service_role|openai_api_key|ai_gateway_api_key' \
+            --exclude-dir=.git --exclude-dir=node_modules --exclude=package-lock.json \
+            app components lib supabase .env.example \
+            > docs/.secret-field-inventory.txt 2>/dev/null || true
+
+          {
+            echo '# ZernFlow Foundation Baseline'
+            echo
+            echo "commit=$(git rev-parse HEAD)"
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            cat .ci/status.env
+            echo "hosted_dependency_matches=$(wc -l < docs/.hosted-dependency-inventory.txt | tr -d ' ')"
+            echo "secret_field_matches=$(wc -l < docs/.secret-field-inventory.txt | tr -d ' ')"
+            for stage in npm_ci lint typecheck test build; do
+              if [ -f ".ci/${stage}.log" ]; then
+                echo
+                echo "## ${stage} tail"
+                tail -n 120 ".ci/${stage}.log"
+              fi
+            done
+          } > docs/.foundation-baseline.txt
+
+      - name: Commit diagnostic evidence
+        shell: sh
+        run: |
+          set -eu
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          git config user.name "Forgejo ZernFlow Diagnostics"
+          git config user.email "zernflow-diagnostics@users.noreply.forgejo"
+          git add docs/.foundation-baseline.txt docs/.hosted-dependency-inventory.txt docs/.secret-field-inventory.txt
+          if git diff --cached --quiet; then
+            echo "Diagnostic evidence unchanged"
+            exit 0
+          fi
+          git commit -m "test: capture controlled foundation diagnostics"
+          git -c http.extraHeader="Authorization: token ${token}" push origin HEAD:refs/heads/feature/foundation-gateway-seam
