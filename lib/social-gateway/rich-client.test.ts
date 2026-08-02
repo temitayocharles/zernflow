@@ -90,8 +90,57 @@ describe("HttpSocialGatewayClient rich replies", () => {
         ],
         carousel: [],
       },
+      delivery_mode: "conversation",
       idempotency_key: "flow:session:node:1",
       reply_to_message_id: null,
+    });
+  });
+
+  it("posts private comment reply mode without changing the endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        id: "operation-2",
+        type: "reply",
+        idempotency_key: "flow:comment:private:1",
+        conversation_id: "conversation-1",
+        message_id: "message-2",
+        reply_to_message_id: "message-1",
+        integration_reference: null,
+        scheduled_at: null,
+        timezone: null,
+        status: "pending",
+        reconciliation_status: "not_required",
+        attempt_count: 0,
+        max_attempts: 3,
+        retryable: false,
+        external_reference: null,
+        error_code: null,
+        error_message: null,
+        next_attempt_at: null,
+        reconciled_at: null,
+        dead_lettered_at: null,
+        created_at: "2026-08-02T00:00:00Z",
+        updated_at: "2026-08-02T00:00:00Z",
+      }),
+    );
+    const client = new HttpSocialGatewayClient({
+      baseUrl: "https://gateway.example.test",
+      operatorApiKey: OPERATOR_KEY,
+      fetchImpl: fetchMock as typeof fetch,
+      production: true,
+    });
+
+    await client.replyToConversation("conversation-1", {
+      text: "Private details",
+      deliveryMode: "private_comment_reply",
+      idempotencyKey: "flow:comment:private:1",
+      replyToMessageId: "message-1",
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      delivery_mode: "private_comment_reply",
+      reply_to_message_id: "message-1",
     });
   });
 });
