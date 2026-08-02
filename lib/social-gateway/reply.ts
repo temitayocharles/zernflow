@@ -28,6 +28,7 @@ export interface GatewayReplyPayload extends Record<string, unknown> {
       }>;
     }>;
   } | null;
+  delivery_mode: "conversation" | "private_comment_reply";
   idempotency_key: string;
   reply_to_message_id: string | null;
 }
@@ -72,6 +73,7 @@ export function serializeReplyInput(input: ReplyInput): GatewayReplyPayload {
           })),
         }
       : null,
+    delivery_mode: input.deliveryMode ?? "conversation",
     idempotency_key: input.idempotencyKey,
     reply_to_message_id: input.replyToMessageId ?? null,
   };
