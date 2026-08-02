@@ -1,6 +1,6 @@
 # ZernFlow Foundation Baseline
 
-commit=dc178738576baf703a003da09101d1bb4cabe6bd
+commit=6e94e9551601de8f68e431e1446487a777860037
 node=v22.23.2
 npm=10.9.8
 npm_ci=0
@@ -8,8 +8,8 @@ lint=0
 typecheck=0
 test=0
 build=0
-hosted_dependency_matches=372
-secret_field_matches=72
+hosted_dependency_matches=360
+secret_field_matches=69
 
 ## npm_ci tail
 npm warn EBADENGINE Unsupported engine {
@@ -23,7 +23,7 @@ npm warn EBADENGINE   required: { node: '>=24', pnpm: '>=10' },
 npm warn EBADENGINE   current: { node: 'v22.23.2', npm: '10.9.8' }
 npm warn EBADENGINE }
 
-added 462 packages in 18s
+added 462 packages in 13s
 
 ## lint tail
 
@@ -35,7 +35,7 @@ added 462 packages in 18s
   224:6  warning  React Hook useEffect has missing dependencies: 'fetchAnalytics', 'initialData.contactGrowth', 'initialData.flowPerformance', 'initialData.messageVolume', and 'initialData.stats'. Either include them or remove the dependency array. If 'setStats' needs the current value of 'initialData.stats', you can also switch to useReducer instead of useState and read 'initialData.stats' in the reducer  react-hooks/exhaustive-deps
 
 /workspace/temitayocharles/zernflow/app/(dashboard)/dashboard/inbox/inbox-view.tsx
-  96:6  warning  React Hook useEffect has a missing dependency: 'selected'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  93:6  warning  React Hook useEffect has a missing dependency: 'selected'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
 
 /workspace/temitayocharles/zernflow/components/flow-builder/flow-canvas.tsx
   282:6  warning  React Hook useCallback has a missing dependency: 'router'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
@@ -114,8 +114,8 @@ added 462 packages in 18s
 
 [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/workspace/temitayocharles/zernflow[39m
 
- [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 20[2mms[22m[39m
- [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 24[2mms[22m[39m
 [90mstderr[2m | lib/inbox-sync.test.ts[2m > [22m[2mbackfillInboxConversations[2m > [22m[2mcontinues with the next channel when one channel's listing fails
 [22m[39m[inbox-sync] backfill failed for channel ch-bad (facebook): Error: account disconnected
     at [90m/workspace/temitayocharles/zernflow/[39mlib/inbox-sync.test.ts:364:30
@@ -129,13 +129,15 @@ added 462 packages in 18s
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
 
- [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 27[2mms[22m[39m
  [32m✓[39m lib/comment-processor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m lib/zernio-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
 
-[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
-[2m      Tests [22m [1m[32m45 passed[39m[22m[90m (45)[39m
-[2m   Start at [22m 08:50:53
-[2m   Duration [22m 1.13s[2m (transform 416ms, setup 0ms, collect 626ms, tests 78ms, environment 1ms, prepare 591ms)[22m
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m54 passed[39m[22m[90m (54)[39m
+[2m   Start at [22m 09:03:13
+[2m   Duration [22m 833ms[2m (transform 392ms, setup 0ms, collect 873ms, tests 98ms, environment 2ms, prepare 720ms)[22m
 
 
 ## build tail
@@ -153,14 +155,14 @@ https://nextjs.org/telemetry
 
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
   Creating an optimized production build ...
-✓ Compiled successfully in 10.4s
+✓ Compiled successfully in 6.1s
   Running TypeScript ...
-  Collecting page data using 3 workers ...
-  Generating static pages using 3 workers (0/32) ...
-  Generating static pages using 3 workers (8/32) 
-  Generating static pages using 3 workers (16/32) 
-  Generating static pages using 3 workers (24/32) 
-✓ Generating static pages using 3 workers (32/32) in 300.7ms
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/32) ...
+  Generating static pages using 5 workers (8/32) 
+  Generating static pages using 5 workers (16/32) 
+  Generating static pages using 5 workers (24/32) 
+✓ Generating static pages using 5 workers (32/32) in 302.6ms
   Finalizing page optimization ...
 
 Route (app)
