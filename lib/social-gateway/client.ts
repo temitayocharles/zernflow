@@ -1,3 +1,4 @@
+import { serializeReplyInput } from "./reply";
 import type {
   AssignmentInput,
   DraftReplyInput,
@@ -64,7 +65,7 @@ function validateBaseUrl(rawValue: string, production: boolean): URL {
   let parsed: URL;
   try {
     parsed = new URL(rawValue);
-  } catch (error) {
+  } catch {
     throw new SocialGatewayConfigurationError(
       "SOCIAL_GATEWAY_BASE_URL must be an absolute HTTP(S) URL",
     );
@@ -194,11 +195,7 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
       {
         auth: "operator",
         method: "POST",
-        body: {
-          text: input.text,
-          idempotency_key: input.idempotencyKey,
-          reply_to_message_id: input.replyToMessageId ?? null,
-        },
+        body: serializeReplyInput(input),
       },
     );
   }
