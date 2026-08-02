@@ -24,6 +24,8 @@ export type GatewayOperationStatus =
   | "unknown";
 export type GatewayRiskLevel = "low" | "medium" | "high";
 export type GatewayAssignmentType = "unassigned" | "agent" | "human";
+export type GatewayReplyAttachmentType = "image" | "video" | "audio" | "file";
+export type GatewayReplyButtonType = "postback" | "url";
 
 export interface GatewayAccount {
   _id: string;
@@ -46,6 +48,7 @@ export interface GatewayAccountList {
 
 export interface GatewayAttachment {
   type: string;
+  external_id?: string | null;
   id?: string | null;
   url?: string | null;
   mime_type?: string | null;
@@ -172,13 +175,50 @@ export interface GetConversationInput {
   messageCursor?: string;
 }
 
+export interface GatewayReplyAttachmentInput {
+  type: GatewayReplyAttachmentType;
+  url: string;
+  mimeType?: string;
+  name?: string;
+}
+
+export interface GatewayReplyButtonInput {
+  title: string;
+  type: GatewayReplyButtonType;
+  payload?: string;
+  url?: string;
+}
+
+export interface GatewayReplyQuickReplyInput {
+  title: string;
+  payload: string;
+}
+
+export interface GatewayReplyCarouselElementInput {
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  buttons?: GatewayReplyButtonInput[];
+}
+
+export interface GatewayReplyPresentationInput {
+  quickReplies?: GatewayReplyQuickReplyInput[];
+  buttons?: GatewayReplyButtonInput[];
+  carousel?: GatewayReplyCarouselElementInput[];
+}
+
 export interface ReplyInput {
-  text: string;
+  text?: string;
+  attachments?: GatewayReplyAttachmentInput[];
+  presentation?: GatewayReplyPresentationInput;
   idempotencyKey: string;
   replyToMessageId?: string;
 }
 
-export interface DraftReplyInput extends ReplyInput {
+export interface DraftReplyInput {
+  text: string;
+  idempotencyKey: string;
+  replyToMessageId?: string;
   riskLevel?: GatewayRiskLevel;
 }
 
