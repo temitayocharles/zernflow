@@ -791,128 +791,170 @@ function executeABSplit(data: ABSplitNodeData): string {
   return `handle:${data.paths[0].name}`;
 }
 
-/**
- * Post a public reply to the comment that triggered this flow.
- * Uses the comment_id and post_id variables set by the comment processor.
- */
-async function executeCommentReply(
+interface GatewayCommentTarget {
+  gatewayConversationId: string;
+  gatewayMessageId: string;
+}
+
+async function resolveGatewayCommentTarget(
   supabase: SupabaseClient<Database>,
-  data: CommentReplyNodeData,
-  context: FlowExecutionContext
-) {
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", context.workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) return;
-
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
-
-  // Resolve late_account_id
-  let lateAccountId = context.lateAccountId;
-  if (!lateAccountId) {
-    const { data: channel } = await supabase
-      .from("channels")
-      .select("late_account_id")
-      .eq("id", context.channelId)
+  context: FlowExecutionContext,
+): Promise<GatewayCommentTarget> {
+  let gatewayConversationId = context.lateConversationId;
+  if (!gatewayConversationId) {
+    const { data: conversation, error } = await supabase
+      .from("conversations")
+      .select("late_conversation_id")
+      .eq("id", context.conversationId)
+      .eq("workspace_id", context.workspaceId)
       .single();
-
-    if (!channel) return;
-    lateAccountId = channel.late_account_id;
+    if (error) throw new Error(error.message);
+    gatewayConversationId = conversation?.late_conversation_id ?? undefined;
+  }
+  if (!gatewayConversationId) {
+    throw new Error(
+      `No Agent Social Gateway conversation ID is projected for ${context.conversationId}`,
+    );
   }
 
-  const commentId = context.variables?.comment_id || context.incomingMessage.sender?.id;
-  if (!commentId) return;
-
-  const postId = context.variables?.post_id;
-  if (!postId) {
-    console.error("No post_id in context variables for commentReply node");
-    return;
+  const commentRef = context.variables?.comment_id?.trim();
+  if (!commentRef) {
+    throw new Error("Comment-triggered flow is missing comment_id");
   }
 
-  const text = interpolateVariables(data.text, context.variables || {});
-
-  try {
-    await zernio.comments.replyToInboxPost({
-      path: { postId },
-      body: { accountId: lateAccountId, message: text, commentId },
+  const gateway = requireSocialGatewayClient();
+  let cursor: string | undefined;
+  for (let page = 0; page < 5; page += 1) {
+    const detail = await gateway.getConversation(gatewayConversationId, {
+      messageLimit: 200,
+      ...(cursor ? { messageCursor: cursor } : {}),
     });
-  } catch (error) {
-    console.error("Failed to post comment reply:", error);
+    const target = detail.messages.find(
+      (message) => message.external_message_ref === commentRef,
+    );
+    if (target) {
+      return {
+        gatewayConversationId,
+        gatewayMessageId: target.id,
+      };
+    }
+    cursor = detail.next_message_cursor ?? undefined;
+    if (!cursor) break;
+  }
+
+  throw new Error(
+    `Gateway comment message ${commentRef} was not found in ${gatewayConversationId}`,
+  );
+}
+
+async function recordCommentReplyOperation(
+  supabase: SupabaseClient<Database>,
+  context: FlowExecutionContext,
+  nodeId: string,
+  deliveryMode: "conversation" | "private_comment_reply",
+  operation: { id: string; status: string },
+): Promise<void> {
+  const { error } = await supabase.from("analytics_events").insert({
+    workspace_id: context.workspaceId,
+    flow_id: context.flowId,
+    contact_id: context.contactId,
+    event_type: "message_sent",
+    metadata: {
+      delivery: "durable_gateway_operation",
+      delivery_mode: deliveryMode,
+      node_id: nodeId,
+      operation_id: operation.id,
+      operation_status: operation.status,
+    },
+  });
+  if (error) {
+    console.error("[flow-engine] comment reply analytics failed", {
+      flowId: context.flowId,
+      nodeId,
+      operationId: operation.id,
+      error: error.message,
+    });
   }
 }
 
-/**
- * Send a private DM to the commenter via the Zernio API's private reply endpoint.
- * This creates a DM conversation from a comment context.
- */
+async function executeCommentReply(
+  supabase: SupabaseClient<Database>,
+  data: CommentReplyNodeData,
+  context: FlowExecutionContext,
+  sessionId: string,
+  nodeId: string,
+) {
+  const target = await resolveGatewayCommentTarget(supabase, context);
+  const text = interpolateVariables(data.text, context.variables ?? {}).trim();
+  if (!text) throw new Error("Public comment reply text is empty");
+
+  const gateway = requireSocialGatewayClient();
+  const operation = await gateway.replyToConversation(
+    target.gatewayConversationId,
+    {
+      text,
+      deliveryMode: "conversation",
+      replyToMessageId: target.gatewayMessageId,
+      idempotencyKey: flowReplyIdempotencyKey({
+        workspaceId: context.workspaceId,
+        flowId: context.flowId,
+        sessionId,
+        nodeId,
+        messageIndex: 0,
+      }),
+    },
+  );
+  await recordCommentReplyOperation(
+    supabase,
+    context,
+    nodeId,
+    "conversation",
+    operation,
+  );
+}
+
 async function executePrivateReply(
   supabase: SupabaseClient<Database>,
   data: PrivateReplyNodeData,
-  context: FlowExecutionContext
+  context: FlowExecutionContext,
+  sessionId: string,
+  nodeId: string,
 ) {
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", context.workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) return;
-
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
-
-  // Resolve late_account_id
-  let lateAccountId = context.lateAccountId;
-  if (!lateAccountId) {
-    const { data: channel } = await supabase
-      .from("channels")
-      .select("late_account_id")
-      .eq("id", context.channelId)
-      .single();
-
-    if (!channel) return;
-    lateAccountId = channel.late_account_id;
+  const target = await resolveGatewayCommentTarget(supabase, context);
+  const text = interpolateVariables(data.text, context.variables ?? {}).trim();
+  const imageUrl = data.imageUrl
+    ? interpolateVariables(data.imageUrl, context.variables ?? {}).trim()
+    : "";
+  if (!text && !imageUrl) {
+    throw new Error("Private comment reply has no dispatchable content");
   }
 
-  const commentId = context.variables?.comment_id || context.incomingMessage.sender?.id;
-  if (!commentId) return;
-
-  const postId = context.variables?.post_id;
-  if (!postId) {
-    console.error("No post_id in context variables for privateReply node");
-    return;
-  }
-
-  const text = interpolateVariables(data.text, context.variables || {});
-
-  try {
-    await zernio.comments.sendPrivateReplyToComment({
-      path: { postId, commentId },
-      body: { accountId: lateAccountId, message: text },
-    });
-
-    await supabase.from("messages").insert({
-      conversation_id: context.conversationId,
-      direction: "outbound",
-      text,
-      attachments: data.imageUrl
-        ? [{ type: "image", url: data.imageUrl }]
-        : null,
-      sent_by_flow_id: context.flowId,
-      status: "sent",
-    });
-  } catch (error) {
-    console.error("Failed to send private reply:", error);
-    await supabase.from("messages").insert({
-      conversation_id: context.conversationId,
-      direction: "outbound",
-      text,
-      sent_by_flow_id: context.flowId,
-      status: "failed",
-    });
-  }
+  const gateway = requireSocialGatewayClient();
+  const operation = await gateway.replyToConversation(
+    target.gatewayConversationId,
+    {
+      ...(text ? { text } : {}),
+      ...(imageUrl
+        ? { attachments: [{ type: "image" as const, url: imageUrl }] }
+        : {}),
+      deliveryMode: "private_comment_reply",
+      replyToMessageId: target.gatewayMessageId,
+      idempotencyKey: flowReplyIdempotencyKey({
+        workspaceId: context.workspaceId,
+        flowId: context.flowId,
+        sessionId,
+        nodeId,
+        messageIndex: 0,
+      }),
+    },
+  );
+  await recordCommentReplyOperation(
+    supabase,
+    context,
+    nodeId,
+    "private_comment_reply",
+    operation,
+  );
 }
 
 async function completeSession(
