@@ -75,6 +75,7 @@ describe("serializeReplyInput", () => {
           },
         ],
       },
+      delivery_mode: "conversation",
       idempotency_key: "flow:session:node:1",
       reply_to_message_id: "message-1",
     });
@@ -90,8 +91,23 @@ describe("serializeReplyInput", () => {
       text: "Hello",
       attachments: [],
       presentation: null,
+      delivery_mode: "conversation",
       idempotency_key: "inbox:conversation:message:1",
       reply_to_message_id: null,
+    });
+  });
+
+  it("preserves private comment reply delivery mode", () => {
+    expect(
+      serializeReplyInput({
+        text: "I sent the details privately",
+        deliveryMode: "private_comment_reply",
+        idempotencyKey: "flow:comment:private:1",
+        replyToMessageId: "comment-message-1",
+      }),
+    ).toMatchObject({
+      delivery_mode: "private_comment_reply",
+      reply_to_message_id: "comment-message-1",
     });
   });
 });
