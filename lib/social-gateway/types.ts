@@ -250,4 +250,5 @@ export interface SocialGatewayClient {
   approveAction(requestId: string, reason?: string): Promise<GatewayActionRequest>;
   rejectAction(requestId: string, reason?: string): Promise<GatewayActionRequest>;
   getOperation(operationId: string): Promise<GatewayOperation>;
+  retryOperation(operationId: string): Promise<GatewayOperation>;
 }
