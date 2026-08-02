@@ -1,6 +1,6 @@
 import type { ReplyInput } from "./types";
 
-export interface GatewayReplyPayload {
+export interface GatewayReplyPayload extends Record<string, unknown> {
   text: string | null;
   attachments: Array<{
     type: string;
