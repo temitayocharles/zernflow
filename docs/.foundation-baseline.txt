@@ -1,6 +1,6 @@
 # ZernFlow Foundation Baseline
 
-commit=a1fe338669f17d7701ba2d53b5709d56836566cd
+commit=bf4c4740d2abf21ddcfc1e735ae78f0bec511ecc
 node=v22.23.2
 npm=10.9.8
 npm_ci=0
@@ -8,8 +8,8 @@ lint=0
 typecheck=0
 test=0
 build=0
-hosted_dependency_matches=305
-secret_field_matches=48
+hosted_dependency_matches=307
+secret_field_matches=49
 
 ## npm_ci tail
 npm warn EBADENGINE Unsupported engine {
@@ -23,7 +23,7 @@ npm warn EBADENGINE   required: { node: '>=24', pnpm: '>=10' },
 npm warn EBADENGINE   current: { node: 'v22.23.2', npm: '10.9.8' }
 npm warn EBADENGINE }
 
-added 462 packages in 12s
+added 462 packages in 16s
 
 ## lint tail
 
@@ -114,8 +114,7 @@ added 462 packages in 12s
 
 [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/workspace/temitayocharles/zernflow[39m
 
- [32m✓[39m lib/social-gateway/webhook.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/webhook.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
 [90mstderr[2m | lib/inbox-sync.test.ts[2m > [22m[2mbackfillInboxConversations[2m > [22m[2mcontinues with the next channel when one channel's listing fails
 [22m[39m[inbox-sync] backfill failed for channel ch-bad (facebook): Error: account disconnected
     at [90m/workspace/temitayocharles/zernflow/[39mlib/inbox-sync.test.ts:364:30
@@ -129,22 +128,23 @@ added 462 packages in 12s
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
 
- [32m✓[39m lib/social-gateway/rich-client.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 14[2mms[22m[39m
- [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 37[2mms[22m[39m
- [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
- [32m✓[39m lib/social-gateway/reply.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 28[2mms[22m[39m
- [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m lib/flow-engine/gateway-message.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
- [32m✓[39m lib/social-gateway/operation-client.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 18[2mms[22m[39m
- [32m✓[39m lib/zernio-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m lib/comment-processor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m lib/concurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/rich-client.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/reply.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m lib/flow-engine/gateway-message.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/operation-client.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m lib/concurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m lib/comment-processor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m lib/zernio-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
 
 [2m Test Files [22m [1m[32m13 passed[39m[22m[90m (13)[39m
 [2m      Tests [22m [1m[32m78 passed[39m[22m[90m (78)[39m
-[2m   Start at [22m 20:34:23
-[2m   Duration [22m 1.41s[2m (transform 653ms, setup 0ms, collect 1.44s, tests 208ms, environment 3ms, prepare 1.70s)[22m
+[2m   Start at [22m 20:45:08
+[2m   Duration [22m 1.34s[2m (transform 663ms, setup 0ms, collect 1.37s, tests 159ms, environment 6ms, prepare 1.79s)[22m
 
 
 ## build tail
@@ -162,14 +162,14 @@ https://nextjs.org/telemetry
 
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
   Creating an optimized production build ...
-✓ Compiled successfully in 5.7s
+✓ Compiled successfully in 6.1s
   Running TypeScript ...
   Collecting page data using 5 workers ...
   Generating static pages using 5 workers (0/33) ...
   Generating static pages using 5 workers (8/33) 
   Generating static pages using 5 workers (16/33) 
   Generating static pages using 5 workers (24/33) 
-✓ Generating static pages using 5 workers (33/33) in 321.8ms
+✓ Generating static pages using 5 workers (33/33) in 304.7ms
   Finalizing page optimization ...
 
 Route (app)
