@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { FlowLoadError, resumeSession } from "@/lib/flow-engine/engine";
-import {
-  SocialGatewayError,
-} from "@/lib/social-gateway/client";
+import { SocialGatewayError } from "@/lib/social-gateway/client";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
+import { parseSocialGatewayWebhookEnvelope } from "@/lib/social-gateway/webhook";
+import { processSocialGatewayWebhookEvent } from "@/lib/social-gateway/webhook-processor";
 import type { Json } from "@/lib/types/database";
 
 // Signals the handler to skip retry/backoff and route straight to the
@@ -260,6 +260,27 @@ async function failJobAndSettleSession({
 
   if (job.type === "send_broadcast") {
     await settleBroadcastRecipientAsFailed({ supabase, job, errorMessage });
+    return;
+  }
+
+  if (job.type === "process_social_gateway_event") {
+    const payload = job.payload as { eventId?: string } | null;
+    if (!payload?.eventId) return;
+    const { error: webhookError } = await supabase
+      .from("webhook_events")
+      .update({
+        status: "failed",
+        completed_at: null,
+        last_error: errorMessage.slice(0, 4000),
+      })
+      .eq("event_id", payload.eventId)
+      .eq("status", "processing");
+    if (webhookError) {
+      console.error(
+        `Failed to mark Social Gateway event ${payload.eventId} as failed:`,
+        webhookError,
+      );
+    }
     return;
   }
 
@@ -523,6 +544,49 @@ async function processJob(
           err
         );
         throw err;
+      }
+      break;
+    }
+
+    case "process_social_gateway_event": {
+      const payload = job.payload as {
+        eventId?: unknown;
+        channelId?: unknown;
+        envelope?: unknown;
+      };
+      if (
+        typeof payload.eventId !== "string" ||
+        typeof payload.channelId !== "string" ||
+        payload.envelope === undefined
+      ) {
+        throw new Error("Social Gateway event job payload is invalid");
+      }
+
+      const envelope = parseSocialGatewayWebhookEnvelope(
+        new TextEncoder().encode(JSON.stringify(payload.envelope)),
+      );
+      await processSocialGatewayWebhookEvent(supabase, {
+        eventId: payload.eventId,
+        channelId: payload.channelId,
+        envelope,
+      });
+
+      const { error: settleError } = await supabase
+        .from("webhook_events")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          last_error: null,
+        })
+        .eq("event_id", payload.eventId)
+        .eq("status", "processing");
+      if (settleError) {
+        // Do not re-run a completed flow merely because the observability
+        // ledger update failed. The scheduled job still records completion.
+        console.error(
+          `Failed to mark Social Gateway event ${payload.eventId} completed:`,
+          settleError,
+        );
       }
       break;
     }

@@ -90,19 +90,23 @@ export async function processComment({
   supabase,
   channel,
   comment,
+  gatewayConversationId,
 }: {
   supabase: SupabaseClient<Database>;
   channel: Channel;
   comment: IncomingComment;
+  gatewayConversationId?: string;
 }): Promise<ProcessCommentResult> {
   const { data: alreadyLogged } = await supabase
     .from("comment_logs")
-    .select("id")
+    .select("id, error")
     .eq("channel_id", channel.id)
     .eq("platform_comment_id", comment.id)
     .maybeSingle();
 
-  if (alreadyLogged) return { matched: false, skipped: "already_processed" };
+  if (alreadyLogged && !alreadyLogged.error) {
+    return { matched: false, skipped: "already_processed" };
+  }
 
   const triggers = await getActiveCommentTriggers(supabase, {
     channelId: channel.id,
@@ -204,6 +208,9 @@ export async function processComment({
           channel_id: channel.id,
           contact_id: contactId,
           platform: channel.platform,
+          ...(gatewayConversationId
+            ? { late_conversation_id: gatewayConversationId }
+            : {}),
           status: "open",
           last_message_at: new Date().toISOString(),
           last_message_preview: `[Comment] ${comment.text.slice(0, 80)}`,
