@@ -25,7 +25,7 @@ jobs:
   diagnose:
     runs-on: ["forgejo-general"]
     container:
-      image: node:22-bookworm
+      image: node:24-bookworm
     steps:
       - name: Prepare Git
         shell: sh
@@ -60,20 +60,22 @@ jobs:
           : > .ci/status.env
           run_stage npm_ci npm ci --no-audit --no-fund
           if grep -q '^npm_ci=0$' .ci/status.env; then
+            run_stage audit npm audit --omit=dev --audit-level=high
             run_stage lint npm run lint
-            run_stage typecheck npx tsc --noEmit
+            run_stage typecheck npm run typecheck
             run_stage test npm test
             set +e
             NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
             NEXT_PUBLIC_SUPABASE_ANON_KEY=diagnostic-anon-key \
             SUPABASE_SERVICE_ROLE_KEY=diagnostic-service-role-key \
             CRON_SECRET=diagnostic-cron-secret-with-at-least-24-characters \
+            NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000 \
             npm run build > .ci/build.log 2>&1
             build_code=$?
             set -e
             printf 'build=%s\n' "${build_code}" >> .ci/status.env
           else
-            printf 'lint=skipped\ntypecheck=skipped\ntest=skipped\nbuild=skipped\n' >> .ci/status.env
+            printf 'audit=skipped\nlint=skipped\ntypecheck=skipped\ntest=skipped\nbuild=skipped\n' >> .ci/status.env
           fi
 
           grep -R -n -E '@zernio/node|zernio|ZERNIO|late_|LATE_|api\.zernio|zernio\.com' \
@@ -94,11 +96,11 @@ jobs:
             cat .ci/status.env
             echo "hosted_dependency_matches=$(wc -l < docs/.hosted-dependency-inventory.txt | tr -d ' ')"
             echo "secret_field_matches=$(wc -l < docs/.secret-field-inventory.txt | tr -d ' ')"
-            for stage in npm_ci lint typecheck test build; do
+            for stage in npm_ci audit lint typecheck test build; do
               if [ -f ".ci/${stage}.log" ]; then
                 echo
                 echo "## ${stage} tail"
-                tail -n 120 ".ci/${stage}.log"
+                tail -n 160 ".ci/${stage}.log"
               fi
             done
           } > docs/.foundation-baseline.txt
