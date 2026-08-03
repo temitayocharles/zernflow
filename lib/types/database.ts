@@ -981,13 +981,37 @@ export interface Database {
         Row: {
           event_id: string;
           received_at: string;
+          source: "zernio" | "social_gateway";
+          delivery_id: string | null;
+          event_type: string | null;
+          status: "processing" | "completed" | "failed";
+          attempt_count: number;
+          claimed_at: string;
+          completed_at: string | null;
+          last_error: string | null;
         };
         Insert: {
           event_id: string;
           received_at?: string;
+          source?: "zernio" | "social_gateway";
+          delivery_id?: string | null;
+          event_type?: string | null;
+          status?: "processing" | "completed" | "failed";
+          attempt_count?: number;
+          claimed_at?: string;
+          completed_at?: string | null;
+          last_error?: string | null;
         };
         Update: {
           received_at?: string;
+          source?: "zernio" | "social_gateway";
+          delivery_id?: string | null;
+          event_type?: string | null;
+          status?: "processing" | "completed" | "failed";
+          attempt_count?: number;
+          claimed_at?: string;
+          completed_at?: string | null;
+          last_error?: string | null;
         };
         Relationships: [];
       };
