@@ -231,6 +231,7 @@ async function processGatewayComment(
     supabase,
     channel,
     gatewayConversationId: envelope.conversation_id ?? undefined,
+    gatewayMessageId: envelope.message_id ?? undefined,
     comment: {
       id: commentId,
       postId,
