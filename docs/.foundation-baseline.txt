@@ -1,14 +1,14 @@
 # ZernFlow Foundation Baseline
 
-commit=d81c9e924a92287f235fa8591fc2e2694e5dfa83
+commit=803bbc5957f7991e37edef34a941edf4d56cf0ff
 node=v22.23.2
 npm=10.9.8
 npm_ci=0
 lint=0
-typecheck=2
+typecheck=0
 test=0
-build=1
-hosted_dependency_matches=294
+build=0
+hosted_dependency_matches=342
 secret_field_matches=50
 
 ## npm_ci tail
@@ -23,7 +23,7 @@ npm warn EBADENGINE   required: { node: '>=24', pnpm: '>=10' },
 npm warn EBADENGINE   current: { node: 'v22.23.2', npm: '10.9.8' }
 npm warn EBADENGINE }
 
-added 462 packages in 18s
+added 462 packages in 12s
 
 ## lint tail
 
@@ -105,9 +105,6 @@ added 462 packages in 18s
 
 
 ## typecheck tail
-app/api/webhooks/social-gateway/route.ts(83,5): error TS2345: Argument of type '"claim_social_gateway_webhook"' is not assignable to parameter of type '"increment_unread" | "increment_broadcast_sent" | "increment_broadcast_failed"'.
-lib/social-gateway/webhook-processor.ts(137,7): error TS2345: Argument of type '"apply_social_gateway_inbound_conversation"' is not assignable to parameter of type '"increment_unread" | "increment_broadcast_sent" | "increment_broadcast_failed"'.
-lib/social-gateway/webhook-processor.ts(233,5): error TS2353: Object literal may only specify known properties, and 'gatewayConversationId' does not exist in type '{ supabase: SupabaseClient<Database, "public", "public", { Tables: { workspaces: { Row: { id: string; name: string; slug: string; late_api_key_encrypted: string | null; ai_api_key: string | null; ai_provider: string; global_keywords: Json; created_at: string; updated_at: string; }; Insert: { ...; }; Update: { ...; }...'.
 
 ## test tail
 
@@ -117,10 +114,6 @@ lib/social-gateway/webhook-processor.ts(233,5): error TS2353: Object literal may
 
 [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/workspace/temitayocharles/zernflow[39m
 
- [32m✓[39m lib/social-gateway/rich-client.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m lib/social-gateway/webhook.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
- [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 24[2mms[22m[39m
 [90mstderr[2m | lib/inbox-sync.test.ts[2m > [22m[2mbackfillInboxConversations[2m > [22m[2mcontinues with the next channel when one channel's listing fails
 [22m[39m[inbox-sync] backfill failed for channel ch-bad (facebook): Error: account disconnected
     at [90m/workspace/temitayocharles/zernflow/[39mlib/inbox-sync.test.ts:364:30
@@ -134,20 +127,25 @@ lib/social-gateway/webhook-processor.ts(233,5): error TS2353: Object literal may
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
     at runSuite [90m(file:///workspace/temitayocharles/zernflow/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1729:8[90m)[39m
 
- [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 38[2mms[22m[39m
- [32m✓[39m lib/social-gateway/reply.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m lib/flow-engine/gateway-message.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/webhook.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m lib/inbox-sync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/rich-client.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m lib/zernio-webhook.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/comment-reply.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/conversation-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/channel-sync.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/reply.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m lib/flow-engine/gateway-message.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m lib/social-gateway/operation-client.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m lib/zernio-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m lib/concurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
  [32m✓[39m lib/comment-processor.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m lib/zernio-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m lib/social-gateway/operation-client.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m lib/concurrency.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
 
-[2m Test Files [22m [1m[32m13 passed[39m[22m[90m (13)[39m
-[2m      Tests [22m [1m[32m78 passed[39m[22m[90m (78)[39m
-[2m   Start at [22m 20:52:32
-[2m   Duration [22m 1.31s[2m (transform 650ms, setup 0ms, collect 1.27s, tests 159ms, environment 3ms, prepare 1.54s)[22m
+[2m Test Files [22m [1m[32m14 passed[39m[22m[90m (14)[39m
+[2m      Tests [22m [1m[32m82 passed[39m[22m[90m (82)[39m
+[2m   Start at [22m 21:00:21
+[2m   Duration [22m 1.72s[2m (transform 631ms, setup 0ms, collect 1.44s, tests 247ms, environment 3ms, prepare 2.15s)[22m
 
 
 ## build tail
@@ -165,18 +163,64 @@ https://nextjs.org/telemetry
 
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
   Creating an optimized production build ...
-✓ Compiled successfully in 6.2s
+✓ Compiled successfully in 6.0s
   Running TypeScript ...
-Failed to compile.
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/34) ...
+  Generating static pages using 5 workers (8/34) 
+  Generating static pages using 5 workers (16/34) 
+  Generating static pages using 5 workers (25/34) 
+✓ Generating static pages using 5 workers (34/34) in 343.5ms
+  Finalizing page optimization ...
 
-./app/api/webhooks/social-gateway/route.ts:83:5
-Type error: Argument of type '"claim_social_gateway_webhook"' is not assignable to parameter of type '"increment_unread" | "increment_broadcast_sent" | "increment_broadcast_failed"'.
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/cron/jobs
+├ ƒ /api/cron/sequences
+├ ƒ /api/v1/broadcasts
+├ ƒ /api/v1/broadcasts/[broadcastId]/send
+├ ƒ /api/v1/channels
+├ ƒ /api/v1/channels/[channelId]
+├ ƒ /api/v1/channels/connect
+├ ƒ /api/v1/channels/sync
+├ ƒ /api/v1/channels/test-key
+├ ƒ /api/v1/contacts
+├ ƒ /api/v1/conversations/sync
+├ ƒ /api/v1/flows
+├ ƒ /api/v1/flows/[flowId]
+├ ƒ /api/v1/flows/[flowId]/publish
+├ ƒ /api/v1/flows/[flowId]/versions
+├ ƒ /api/v1/flows/[flowId]/versions/[versionId]/restore
+├ ƒ /api/v1/messages
+├ ƒ /api/webhooks/late
+├ ƒ /api/webhooks/social-gateway
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/analytics
+├ ƒ /dashboard/broadcasts
+├ ƒ /dashboard/channels
+├ ƒ /dashboard/channels/callback
+├ ƒ /dashboard/contacts
+├ ƒ /dashboard/contacts/[contactId]
+├ ƒ /dashboard/flows
+├ ƒ /dashboard/flows/[flowId]
+├ ƒ /dashboard/flows/templates
+├ ƒ /dashboard/growth
+├ ƒ /dashboard/inbox
+├ ƒ /dashboard/sequences
+├ ƒ /dashboard/sequences/[sequenceId]
+├ ƒ /dashboard/settings
+├ ƒ /dashboard/settings/team
+├ ƒ /invite/[inviteId]
+├ ○ /login
+├ ○ /register
+├ ○ /robots.txt
+└ ○ /sitemap.xml
 
-[0m [90m 81 |[39m
- [90m 82 |[39m   [36mconst[39m { data[33m:[39m claimResult[33m,[39m error[33m:[39m claimError } [33m=[39m [36mawait[39m supabase[33m.[39mrpc(
-[31m[1m>[22m[39m[90m 83 |[39m     [32m"claim_social_gateway_webhook"[39m[33m,[39m
- [90m    |[39m     [31m[1m^[22m[39m
- [90m 84 |[39m     {
- [90m 85 |[39m       p_event_id[33m:[39m envelope[33m.[39mid[33m,[39m
- [90m 86 |[39m       p_delivery_id[33m:[39m deliveryId[33m,[39m[0m
-Next.js build worker exited with code: 1 and signal: null
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
