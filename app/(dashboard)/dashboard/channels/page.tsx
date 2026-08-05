@@ -10,8 +10,11 @@ export default async function ChannelsPage() {
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false });
 
-  const providerOnboardingEnabled =
-    process.env.SOCIAL_GATEWAY_PROVIDER_ONBOARDING_ENABLED === "true";
+  // The Gateway currently creates administrator provisioning sessions, not a
+  // complete customer OAuth/token-exchange flow. Keep self-service onboarding
+  // disabled until the callback adapter can store provider credentials in Vault
+  // and complete the connection with a Vault reference.
+  const providerOnboardingEnabled = false;
 
   return (
     <ChannelsView

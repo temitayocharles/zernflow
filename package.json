@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:production": "node scripts/production-smoke.mjs"
   },
   "dependencies": {
     "@zernio/node": "^0.2.0",

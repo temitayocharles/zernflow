@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
+import { isSessionMaxAgeExceeded } from "@/lib/auth/session-policy";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -41,6 +42,18 @@ export async function updateSession(request: NextRequest) {
   // Auth callback and API routes (including webhooks) always pass through
   if (isAuthCallback || isApiRoute) {
     return supabaseResponse;
+  }
+
+  if (user && isDashboard && isSessionMaxAgeExceeded(user.last_sign_in_at)) {
+    await supabase.auth.signOut();
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("reason", "session_expired");
+    const redirectResponse = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
   }
 
   // Redirect logged-in users away from auth pages to dashboard

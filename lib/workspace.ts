@@ -2,6 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { isSessionMaxAgeExceeded } from "@/lib/auth/session-policy";
 
 export const WORKSPACE_COOKIE = "zernflow_workspace_id";
 
@@ -16,6 +17,10 @@ export const getWorkspace = cache(async () => {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+  if (isSessionMaxAgeExceeded(user.last_sign_in_at)) {
+    await supabase.auth.signOut();
+    redirect("/login?reason=session_expired");
+  }
 
   const cookieStore = await cookies();
   const selectedId = cookieStore.get(WORKSPACE_COOKIE)?.value;

@@ -1,5 +1,6 @@
 import { getWorkspace } from "@/lib/workspace";
 import { Sidebar } from "@/components/sidebar";
+import { SessionGuard } from "@/components/session-guard";
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen">
+      <SessionGuard userId={user.id} />
       <Sidebar workspace={workspace} user={user} workspaces={workspaces} />
       <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
     </div>
