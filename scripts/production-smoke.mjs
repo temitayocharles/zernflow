@@ -20,6 +20,21 @@ for (const path of ['/', '/register', '/login', '/forgot-password', '/reset-pass
   await check(`GET ${path}`, async () => {
     const response = await fetch(`${baseUrl}${path}`, { redirect: 'manual' });
     if (response.status !== 200) throw new Error(`expected 200, received ${response.status}`);
+    const requiredHeaders = {
+      'content-security-policy': 'frame-ancestors',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+      'permissions-policy': 'camera=()',
+    };
+    for (const [header, expected] of Object.entries(requiredHeaders)) {
+      const value = response.headers.get(header) || '';
+      if (!value.includes(expected)) throw new Error(`${header} missing expected value ${expected}`);
+    }
+    if (path !== '/') {
+      const cacheControl = response.headers.get('cache-control') || '';
+      if (!cacheControl.includes('no-store')) throw new Error(`auth route ${path} is cacheable: ${cacheControl}`);
+    }
     return { status: response.status };
   });
 }
