@@ -1,5 +1,6 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createHmac } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ensureWebhookRegistered,
   generateWebhookSecret,
@@ -8,6 +9,39 @@ import {
   verifyWebhookSignature,
   WEBHOOK_NAME,
 } from "./zernio-webhook";
+
+interface CapturedUpdate {
+  table: string;
+  patch: Record<string, unknown>;
+}
+
+function makeFakeSupabase(seed: { webhook_secret?: string | null }) {
+  const updates: CapturedUpdate[] = [];
+  const client = {
+    from(table: string) {
+      return {
+        select() {
+          return this;
+        },
+        eq() {
+          return this;
+        },
+        single() {
+          return Promise.resolve({ data: { webhook_secret: seed.webhook_secret ?? null }, error: null });
+        },
+        update(patch: Record<string, unknown>) {
+          return {
+            eq() {
+              updates.push({ table, patch });
+              return Promise.resolve({ data: null, error: null });
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient, updates };
+}
 
 /**
  * Builds a fake Zernio client exposing only the `webhooks` surface used by
@@ -18,7 +52,7 @@ function fakeZernio(existing: Array<Record<string, unknown>>) {
   const update = vi.fn().mockResolvedValue({ data: { success: true } });
   const get = vi.fn().mockResolvedValue({ data: { webhooks: existing } });
   return {
-    client: { webhooks: { list: get, create, update } },
+    client: { webhooks: { getWebhookSettings: get, createWebhookSettings: create, updateWebhookSettings: update } },
     get,
     create,
     update,
@@ -41,10 +75,12 @@ describe("ensureWebhookRegistered", () => {
     expect(res.action).toBe("created");
     expect(z.create).toHaveBeenCalledTimes(1);
     expect(z.create).toHaveBeenCalledWith({
-      name: WEBHOOK_NAME,
-      url: EXPECTED_URL,
-      secret: "s3cr3t",
-      events: ["message.received", "comment.received"],
+      body: {
+        name: WEBHOOK_NAME,
+        url: EXPECTED_URL,
+        secret: "s3cr3t",
+        events: ["message.received", "comment.received"],
+      },
     });
     expect(z.update).not.toHaveBeenCalled();
   });
@@ -61,26 +97,6 @@ describe("ensureWebhookRegistered", () => {
     expect(z.update).not.toHaveBeenCalled();
   });
 
-  it("does not rotate endlessly when the self-hosted gateway redacts the secret", async () => {
-    const z = fakeZernio([
-      {
-        _id: "wh1",
-        name: WEBHOOK_NAME,
-        url: EXPECTED_URL,
-        secret: null,
-        events: ["message.received", "comment.received"],
-      },
-    ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await ensureWebhookRegistered(z.client as any, {
-      ...opts,
-      events: [...opts.events],
-    });
-
-    expect(res.action).toBe("unchanged");
-    expect(z.update).not.toHaveBeenCalled();
-  });
-
   it("updates when the url is stale (AC3)", async () => {
     const z = fakeZernio([
       { _id: "wh1", name: WEBHOOK_NAME, url: "https://old.example/api/webhooks/late", events: ["message.received", "comment.received"] },
@@ -91,11 +107,13 @@ describe("ensureWebhookRegistered", () => {
     expect(res.action).toBe("updated");
     expect(z.update).toHaveBeenCalledTimes(1);
     expect(z.update).toHaveBeenCalledWith({
-      id: "wh1",
-      name: WEBHOOK_NAME,
-      url: EXPECTED_URL,
-      secret: "s3cr3t",
-      events: ["message.received", "comment.received"],
+      body: {
+        _id: "wh1",
+        name: WEBHOOK_NAME,
+        url: EXPECTED_URL,
+        secret: "s3cr3t",
+        events: ["message.received", "comment.received"],
+      },
     });
     expect(z.create).not.toHaveBeenCalled();
   });
@@ -109,11 +127,13 @@ describe("ensureWebhookRegistered", () => {
 
     expect(res.action).toBe("updated");
     expect(z.update).toHaveBeenCalledWith({
-      id: "wh1",
-      name: WEBHOOK_NAME,
-      url: EXPECTED_URL,
-      secret: "s3cr3t",
-      events: ["message.received", "comment.received"],
+      body: {
+        _id: "wh1",
+        name: WEBHOOK_NAME,
+        url: EXPECTED_URL,
+        secret: "s3cr3t",
+        events: ["message.received", "comment.received"],
+      },
     });
   });
 
@@ -137,10 +157,12 @@ describe("ensureWebhookRegistered", () => {
     );
 
     expect(z.create).toHaveBeenCalledWith({
-      name: WEBHOOK_NAME,
-      url: EXPECTED_URL,
-      secret: "s3cr3t",
-      events: ["message.received", "comment.received"],
+      body: {
+        name: WEBHOOK_NAME,
+        url: EXPECTED_URL,
+        secret: "s3cr3t",
+        events: ["message.received", "comment.received"],
+      },
     });
   });
 
@@ -171,11 +193,13 @@ describe("ensureWebhookRegistered", () => {
 
     expect(res.action).toBe("updated");
     expect(z.update).toHaveBeenCalledWith({
-      id: "wh9",
-      name: WEBHOOK_NAME,
-      url: EXPECTED_URL,
-      secret: "s3cr3t",
-      events: ["message.received", "comment.received"],
+      body: {
+        _id: "wh9",
+        name: WEBHOOK_NAME,
+        url: EXPECTED_URL,
+        secret: "s3cr3t",
+        events: ["message.received", "comment.received"],
+      },
     });
     expect(z.create).not.toHaveBeenCalled();
   });
@@ -240,24 +264,24 @@ describe("generateWebhookSecret", () => {
 });
 
 describe("getOrCreateWorkspaceWebhookSecret", () => {
-  const original = process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
+  it("returns the existing secret without writing (AC5)", async () => {
+    const fake = makeFakeSupabase({ webhook_secret: "existing-secret" });
+    const secret = await getOrCreateWorkspaceWebhookSecret(fake.client, "ws-1");
 
-  afterEach(() => {
-    if (original === undefined) delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
-    else process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = original;
+    expect(secret).toBe("existing-secret");
+    expect(fake.updates).toHaveLength(0);
   });
 
-  it("returns the runtime-managed secret without touching Supabase", async () => {
-    process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = "vault-managed-secret";
-    const secret = await getOrCreateWorkspaceWebhookSecret({}, "ws-1");
-    expect(secret).toBe("vault-managed-secret");
-  });
+  it("generates, persists and returns a new secret when missing (AC1, AC5)", async () => {
+    const fake = makeFakeSupabase({ webhook_secret: null });
+    const secret = await getOrCreateWorkspaceWebhookSecret(fake.client, "ws-1");
 
-  it("fails closed when the runtime secret is missing", async () => {
-    delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
-    await expect(getOrCreateWorkspaceWebhookSecret({}, "ws-1")).rejects.toThrow(
-      "SOCIAL_GATEWAY_WEBHOOK_SECRET",
-    );
+    expect(secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(fake.updates).toHaveLength(1);
+    expect(fake.updates[0]).toMatchObject({
+      table: "workspaces",
+      patch: { webhook_secret: secret },
+    });
   });
 });
 
@@ -283,28 +307,30 @@ describe("verifyWebhookSignature (AC4)", () => {
   });
 });
 
-describe("resolveWebhookSecret", () => {
-  const original = process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
-
-  afterEach(() => {
-    if (original === undefined) delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
-    else process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = original;
-  });
-
-  it("returns only the runtime-managed secret", async () => {
-    process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET = "vault-secret";
-    const secret = await resolveWebhookSecret({}, {
+describe("resolveWebhookSecret (AC4)", () => {
+  it("prefers the workspace secret over the channel secret", async () => {
+    const fake = makeFakeSupabase({ webhook_secret: "ws-secret" });
+    const secret = await resolveWebhookSecret(fake.client, {
       workspace_id: "ws-1",
-      webhook_secret: "legacy-row-secret",
+      webhook_secret: "legacy-channel-secret",
     });
-    expect(secret).toBe("vault-secret");
+    expect(secret).toBe("ws-secret");
   });
 
-  it("does not fall back to a database-row secret", async () => {
-    delete process.env.SOCIAL_GATEWAY_WEBHOOK_SECRET;
-    const secret = await resolveWebhookSecret({}, {
+  it("falls back to the legacy channel secret when workspace has none", async () => {
+    const fake = makeFakeSupabase({ webhook_secret: null });
+    const secret = await resolveWebhookSecret(fake.client, {
       workspace_id: "ws-1",
-      webhook_secret: "legacy-row-secret",
+      webhook_secret: "legacy-channel-secret",
+    });
+    expect(secret).toBe("legacy-channel-secret");
+  });
+
+  it("returns null when neither secret is set", async () => {
+    const fake = makeFakeSupabase({ webhook_secret: null });
+    const secret = await resolveWebhookSecret(fake.client, {
+      workspace_id: "ws-1",
+      webhook_secret: null,
     });
     expect(secret).toBeNull();
   });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SocialGatewayClient } from "./social-gateway/client";
+import type { Zernio } from "./zernio-client";
 import { backfillInboxConversations } from "./inbox-sync";
 
 interface CapturedRow {
@@ -108,8 +108,8 @@ interface FakePage {
   pagination?: { hasMore?: boolean; nextCursor?: string | null };
 }
 
-/** Fake gateway client returning one prepared page per conversation-list call. */
-function fakeGateway(pages: FakePage[]) {
+/** Fake Zernio client returning one prepared page per listInboxConversations call. */
+function fakeZernio(pages: FakePage[]) {
   let call = 0;
   const list = vi.fn().mockImplementation(() => {
     const page = pages[Math.min(call, pages.length - 1)];
@@ -117,7 +117,7 @@ function fakeGateway(pages: FakePage[]) {
     return Promise.resolve({ data: page });
   });
   return {
-    client: { conversations: { list } } as unknown as SocialGatewayClient,
+    client: { messages: { listInboxConversations: list } } as unknown as Zernio,
     list,
   };
 }
@@ -138,23 +138,20 @@ const conv = (id: string, extra: Record<string, unknown> = {}) => ({
 describe("backfillInboxConversations", () => {
   it("imports missing conversations with contact + conversation rows", async () => {
     const fake = makeFakeSupabase({});
-    const z = fakeGateway([
+    const z = fakeZernio([
       { data: [conv("c1"), conv("c2")], pagination: { hasMore: false } },
     ]);
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
 
     expect(res.imported).toBe(2);
     expect(z.list).toHaveBeenCalledWith({
-      accountId: "acc-1",
-      limit: 50,
-      sortOrder: "desc",
-      cursor: undefined,
+      query: { accountId: "acc-1", limit: 50, sortOrder: "desc", cursor: undefined },
     });
 
     const contactInserts = fake.inserts.filter((i) => i.table === "contacts");
@@ -194,7 +191,7 @@ describe("backfillInboxConversations", () => {
 
   it("imports archived Zernio conversations as closed, not open", async () => {
     const fake = makeFakeSupabase({});
-    const z = fakeGateway([
+    const z = fakeZernio([
       {
         data: [conv("c1", { status: "archived" }), conv("c2", { status: "active" })],
         pagination: { hasMore: false },
@@ -203,7 +200,7 @@ describe("backfillInboxConversations", () => {
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -221,7 +218,7 @@ describe("backfillInboxConversations", () => {
 
   it("keeps only the most recent conversation per contact within a run", async () => {
     const fake = makeFakeSupabase({});
-    const z = fakeGateway([
+    const z = fakeZernio([
       {
         data: [conv("c1"), conv("c2", { participantId: "sender-c1" })],
         pagination: { hasMore: false },
@@ -230,7 +227,7 @@ describe("backfillInboxConversations", () => {
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -247,11 +244,11 @@ describe("backfillInboxConversations", () => {
       contactChannelBySender: { "sender-c1": "contact-existing" },
       conversationContactIds: ["contact-existing"],
     });
-    const z = fakeGateway([{ data: [conv("c1")], pagination: { hasMore: false } }]);
+    const z = fakeZernio([{ data: [conv("c1")], pagination: { hasMore: false } }]);
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -264,13 +261,13 @@ describe("backfillInboxConversations", () => {
 
   it("skips conversations already present locally (insert-only backfill)", async () => {
     const fake = makeFakeSupabase({ existingConversationIds: ["c1"] });
-    const z = fakeGateway([
+    const z = fakeZernio([
       { data: [conv("c1"), conv("c2")], pagination: { hasMore: false } },
     ]);
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -284,11 +281,11 @@ describe("backfillInboxConversations", () => {
     const fake = makeFakeSupabase({
       contactChannelBySender: { "sender-c1": "contact-existing" },
     });
-    const z = fakeGateway([{ data: [conv("c1")], pagination: { hasMore: false } }]);
+    const z = fakeZernio([{ data: [conv("c1")], pagination: { hasMore: false } }]);
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -305,14 +302,14 @@ describe("backfillInboxConversations", () => {
 
   it("follows nextCursor while hasMore and stops when hasMore is false", async () => {
     const fake = makeFakeSupabase({});
-    const z = fakeGateway([
+    const z = fakeZernio([
       { data: [conv("c1")], pagination: { hasMore: true, nextCursor: "cur-2" } },
       { data: [conv("c2")], pagination: { hasMore: false, nextCursor: null } },
     ]);
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -320,22 +317,19 @@ describe("backfillInboxConversations", () => {
     expect(res.imported).toBe(2);
     expect(z.list).toHaveBeenCalledTimes(2);
     expect(z.list).toHaveBeenNthCalledWith(2, {
-      accountId: "acc-1",
-      limit: 50,
-      sortOrder: "desc",
-      cursor: "cur-2",
+      query: { accountId: "acc-1", limit: 50, sortOrder: "desc", cursor: "cur-2" },
     });
   });
 
   it("hard-caps pagination at 4 pages per channel", async () => {
     const fake = makeFakeSupabase({});
-    const z = fakeGateway([
+    const z = fakeZernio([
       { data: [conv("c1")], pagination: { hasMore: true, nextCursor: "next" } },
     ]);
 
     await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -345,7 +339,7 @@ describe("backfillInboxConversations", () => {
 
   it("skips items without an id or participantId", async () => {
     const fake = makeFakeSupabase({});
-    const z = fakeGateway([
+    const z = fakeZernio([
       {
         data: [conv("c1"), { id: "c2" }, { participantId: "sender-x" }],
         pagination: { hasMore: false },
@@ -354,7 +348,7 @@ describe("backfillInboxConversations", () => {
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway: z.client,
+      zernio: z.client,
       workspaceId: "ws-1",
       channels: [channel],
     });
@@ -371,11 +365,11 @@ describe("backfillInboxConversations", () => {
       .mockResolvedValueOnce({
         data: { data: [conv("c1")], pagination: { hasMore: false } },
       });
-    const gateway = { conversations: { list } } as unknown as SocialGatewayClient;
+    const zernio = { messages: { listInboxConversations: list } } as unknown as Zernio;
 
     const res = await backfillInboxConversations({
       supabase: fake.client,
-      gateway,
+      zernio,
       workspaceId: "ws-1",
       channels: [
         { id: "ch-bad", late_account_id: "acc-bad", platform: "facebook" },

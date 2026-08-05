@@ -1,164 +1,135 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createSocialGatewayClient } from "@/lib/social-gateway/client";
 import {
-  ensureWebhookRegistered,
-  getOrCreateWorkspaceWebhookSecret,
-} from "@/lib/zernio-webhook";
-import { backfillInboxConversations } from "@/lib/inbox-sync";
+  planGatewayChannelSync,
+  type ExistingChannel,
+} from "@/lib/social-gateway/channel-sync";
+import {
+  SocialGatewayConfigurationError,
+  SocialGatewayError,
+} from "@/lib/social-gateway/client";
+import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
+import { getWorkspace } from "@/lib/workspace";
 
-async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, workspaces(*)")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
-
-  if (!membership?.workspaces) return null;
-  return membership.workspaces;
+function gatewayFailure(error: unknown): NextResponse {
+  if (error instanceof SocialGatewayConfigurationError) {
+    return NextResponse.json(
+      { code: error.code, error: error.message },
+      { status: 503 },
+    );
+  }
+  if (error instanceof SocialGatewayError) {
+    return NextResponse.json(
+      { code: error.code, error: error.message, retryable: error.retryable },
+      { status: error.retryable ? 503 : 502 },
+    );
+  }
+  console.error("[channels/sync] unexpected failure", {
+    errorType: error instanceof Error ? error.name : typeof error,
+  });
+  return NextResponse.json(
+    { code: "channel_sync_failed", error: "Channel synchronization failed" },
+    { status: 500 },
+  );
 }
 
 /**
  * POST /api/v1/channels/sync
  *
- * Syncs all configured gateway accounts as channels for the current workspace.
- * Creates new channels for accounts not yet in the DB.
- * Deactivates channels whose gateway accounts no longer exist.
+ * Projects connected Agent Social Gateway accounts into ZernFlow's local
+ * channel table. The gateway remains the provider-account source of truth;
+ * this table is a UI/automation projection only.
  */
 export async function POST() {
-  const supabase = await createClient();
-  const workspace = await getWorkspace(supabase);
-  if (!workspace)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-
-  const gateway = createSocialGatewayClient();
+  const { workspace, role, supabase } = await getWorkspace();
+  if (role !== "owner") {
+    return NextResponse.json(
+      { code: "workspace_owner_required", error: "Workspace owner access required" },
+      { status: 403 },
+    );
+  }
 
   try {
-    const res = await gateway.accounts.list();
-    const gatewayAccounts = res.data?.accounts ?? [];
+    const gateway = requireSocialGatewayClient();
+    const [{ accounts }, existingResult] = await Promise.all([
+      gateway.listAccounts(),
+      supabase
+        .from("channels")
+        .select(
+          "id, late_account_id, platform, username, display_name, profile_picture, is_active",
+        )
+        .eq("workspace_id", workspace.id),
+    ]);
 
-    // Get existing channels for this workspace
-    const { data: existingChannels } = await supabase
-      .from("channels")
-      .select("*")
-      .eq("workspace_id", workspace.id);
+    if (existingResult.error) {
+      throw new Error(`Failed to read local channels: ${existingResult.error.message}`);
+    }
 
-    const existingByGatewayId = new Map(
-      (existingChannels ?? []).map((c) => [c.late_account_id, c])
+    // `late_account_id` is retained temporarily as the database column name,
+    // but values written by this path are Agent Social Gateway account IDs.
+    const plan = planGatewayChannelSync(
+      accounts,
+      (existingResult.data ?? []) as ExistingChannel[],
     );
 
-    // The SDK type doesn't declare profilePicture but the API returns it
-    const gatewayAccountIds = new Set(gatewayAccounts.map((a: { _id?: string }) => a._id).filter(Boolean));
-    let created = 0;
-    let updated = 0;
-
-    for (const account of gatewayAccounts) {
-      if (!account._id) continue;
-      const acc = account as typeof account & { profilePicture?: string };
-      const profilePic = acc.profilePicture || null;
-
-      const existing = existingByGatewayId.get(account._id);
-
-      if (existing) {
-        if (
-          existing.username !== (account.username || null) ||
-          existing.display_name !== (account.displayName || account.username || null) ||
-          existing.profile_picture !== profilePic
-        ) {
-          await supabase
-            .from("channels")
-            .update({
-              username: account.username || null,
-              display_name: account.displayName || account.username || null,
-              profile_picture: profilePic,
-            })
-            .eq("id", existing.id);
-          updated++;
-        }
-      } else {
-        await supabase.from("channels").insert({
+    if (plan.creates.length > 0) {
+      const { error } = await supabase.from("channels").insert(
+        plan.creates.map((item) => ({
           workspace_id: workspace.id,
-          platform: account.platform as "facebook" | "instagram" | "twitter" | "telegram" | "bluesky" | "reddit",
-          late_account_id: account._id,
-          username: account.username || null,
-          display_name: account.displayName || account.username || null,
-          profile_picture: profilePic,
-          is_active: true,
-        });
-        created++;
-      }
+          platform: item.platform,
+          late_account_id: item.gatewayAccountId,
+          username: item.username,
+          display_name: item.displayName,
+          profile_picture: item.profilePicture,
+          is_active: item.isActive,
+        })),
+      );
+      if (error) throw new Error(`Failed to create channels: ${error.message}`);
     }
 
-    // Deactivate channels whose gateway accounts no longer exist
-    let deactivated = 0;
-    for (const channel of existingChannels ?? []) {
-      if (!gatewayAccountIds.has(channel.late_account_id) && channel.is_active) {
-        await supabase
-          .from("channels")
-          .update({ is_active: false })
-          .eq("id", channel.id);
-        deactivated++;
-      }
-    }
-
-    // Re-register the webhook so inbound events reach the Inbox. Both the
-    // Channels "Sync" button and the OAuth callback land here, and until now
-    // registration only happened in the Settings test-key flow (#12).
-    // Best-effort: a failure must not block the channel sync.
-    try {
-      const secret = await getOrCreateWorkspaceWebhookSecret(supabase, workspace.id);
-      await ensureWebhookRegistered(gateway, {
-        appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        secret,
-        events: ["message.received", "comment.received"],
-      });
-    } catch (err) {
-      console.error("[channels/sync] webhook auto-registration failed:", err);
-    }
-
-    // Backfill conversations that predate webhook registration (best-effort).
-    let conversationsImported = 0;
-    try {
-      const { data: activeChannels } = await supabase
+    for (const item of plan.updates) {
+      const { error } = await supabase
         .from("channels")
-        .select("id, late_account_id, platform")
-        .eq("workspace_id", workspace.id)
-        .eq("is_active", true);
-
-      const { imported } = await backfillInboxConversations({
-        supabase,
-        gateway,
-        workspaceId: workspace.id,
-        channels: activeChannels ?? [],
-      });
-      conversationsImported = imported;
-    } catch (err) {
-      console.error("[channels/sync] inbox backfill failed:", err);
+        .update({
+          platform: item.platform,
+          username: item.username,
+          display_name: item.displayName,
+          profile_picture: item.profilePicture,
+          is_active: item.isActive,
+        })
+        .eq("id", item.channelId)
+        .eq("workspace_id", workspace.id);
+      if (error) throw new Error(`Failed to update channel: ${error.message}`);
     }
 
-    // Return updated channel list
-    const { data: channels } = await supabase
+    if (plan.deactivateChannelIds.length > 0) {
+      const { error } = await supabase
+        .from("channels")
+        .update({ is_active: false })
+        .eq("workspace_id", workspace.id)
+        .in("id", plan.deactivateChannelIds);
+      if (error) throw new Error(`Failed to deactivate channels: ${error.message}`);
+    }
+
+    const { data: channels, error: channelListError } = await supabase
       .from("channels")
       .select("*")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false });
+    if (channelListError) {
+      throw new Error(`Failed to list synchronized channels: ${channelListError.message}`);
+    }
 
     return NextResponse.json({
+      source: "agent-social-gateway",
       channels: channels ?? [],
-      synced: { created, updated, deactivated, conversationsImported },
+      synced: {
+        created: plan.creates.length,
+        updated: plan.updates.length,
+        deactivated: plan.deactivateChannelIds.length,
+        unsupported: plan.unsupported,
+      },
     });
   } catch (error) {
-    console.error("Failed to sync channels:", error);
-    return NextResponse.json(
-      { error: `Failed to sync channels: ${error instanceof Error ? error.message : String(error)}` },
-      { status: 500 }
-    );
+    return gatewayFailure(error);
   }
 }

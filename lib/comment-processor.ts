@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database";
 import { executeFlow } from "@/lib/flow-engine/engine";
-import { createSocialGatewayClient } from "@/lib/social-gateway/client";
+import { dispatchPublicCommentReply } from "@/lib/social-gateway/comment-reply";
+import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Trigger = Database["public"]["Tables"]["triggers"]["Row"];
@@ -90,19 +91,25 @@ export async function processComment({
   supabase,
   channel,
   comment,
+  gatewayConversationId,
+  gatewayMessageId,
 }: {
   supabase: SupabaseClient<Database>;
   channel: Channel;
   comment: IncomingComment;
+  gatewayConversationId?: string;
+  gatewayMessageId?: string;
 }): Promise<ProcessCommentResult> {
   const { data: alreadyLogged } = await supabase
     .from("comment_logs")
-    .select("id")
+    .select("id, error")
     .eq("channel_id", channel.id)
     .eq("platform_comment_id", comment.id)
     .maybeSingle();
 
-  if (alreadyLogged) return { matched: false, skipped: "already_processed" };
+  if (alreadyLogged && !alreadyLogged.error) {
+    return { matched: false, skipped: "already_processed" };
+  }
 
   const triggers = await getActiveCommentTriggers(supabase, {
     channelId: channel.id,
@@ -168,19 +175,46 @@ export async function processComment({
     }
 
     let replySent = false;
+    let replyProvider: "social_gateway" | "legacy_zernio" | null = null;
     if (config.replyText) {
-      try {
-        const gateway = createSocialGatewayClient();
-        await gateway.comments.replyPublic({
-          postId: comment.postId,
-          commentId: comment.id,
-          accountId: channel.late_account_id,
-          message: config.replyText,
-        });
-        replySent = true;
-      } catch (err) {
-        console.error("Failed to post comment reply:", err);
+      let legacy:
+        | {
+            apiKey: string;
+            accountId: string;
+            postId: string;
+            commentId: string;
+          }
+        | undefined;
+
+      if (!gatewayConversationId || !gatewayMessageId) {
+        const { data: workspace, error: workspaceError } = await supabase
+          .from("workspaces")
+          .select("late_api_key_encrypted")
+          .eq("id", channel.workspace_id)
+          .single();
+        if (workspaceError) throw new Error(workspaceError.message);
+        if (workspace?.late_api_key_encrypted) {
+          legacy = {
+            apiKey: workspace.late_api_key_encrypted,
+            accountId: channel.late_account_id,
+            postId: comment.postId,
+            commentId: comment.id,
+          };
+        }
       }
+
+      const reply = await dispatchPublicCommentReply(
+        requireSocialGatewayClient(),
+        {
+          text: config.replyText,
+          idempotencyKey: `zernflow:comment-reply:${channel.id}:${comment.id}`,
+          gatewayConversationId,
+          gatewayMessageId,
+          legacy,
+        },
+      );
+      replySent = true;
+      replyProvider = reply.provider;
     }
 
     // Local conversation only — there is no Zernio DM conversation until the
@@ -194,6 +228,9 @@ export async function processComment({
           channel_id: channel.id,
           contact_id: contactId,
           platform: channel.platform,
+          ...(gatewayConversationId
+            ? { late_conversation_id: gatewayConversationId }
+            : {}),
           status: "open",
           last_message_at: new Date().toISOString(),
           last_message_preview: `[Comment] ${comment.text.slice(0, 80)}`,
@@ -246,6 +283,7 @@ export async function processComment({
         commentId: comment.id,
         dmSent,
         replySent,
+        replyProvider,
       } as unknown as Json,
     });
 
