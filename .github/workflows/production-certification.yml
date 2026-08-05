@@ -48,3 +48,18 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+
+  live-smoke:
+    needs: quality
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify deployed production routes and security boundaries
+        env:
+          PRODUCTION_BASE_URL: https://http--zernflow--5779gkgwrk2d.code.run
+        run: node scripts/production-smoke.mjs "$PRODUCTION_BASE_URL"
