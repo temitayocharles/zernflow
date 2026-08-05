@@ -148,16 +148,15 @@ export function ChannelsView({
 
       setChannels(data.channels ?? []);
       const { created, updated, deactivated, conversationsImported = 0 } = data.synced;
-      if (created === 0 && updated === 0 && deactivated === 0 && conversationsImported === 0) {
-        setSyncMessage("All channels up to date");
-      } else {
-        const parts = [];
-        if (created > 0) parts.push(`${created} added`);
-        if (updated > 0) parts.push(`${updated} updated`);
-        if (deactivated > 0) parts.push(`${deactivated} deactivated`);
-        if (conversationsImported > 0) parts.push(`${conversationsImported} conversations imported`);
-        setSyncMessage(parts.join(", "));
-      }
+      const parts: string[] = [];
+      if (created > 0) parts.push(`${created} added`);
+      if (updated > 0) parts.push(`${updated} updated`);
+      if (deactivated > 0) parts.push(`${deactivated} deactivated`);
+      if (conversationsImported > 0) parts.push(`${conversationsImported} conversations imported`);
+      if (parts.length === 0) parts.push("All channels up to date");
+      const grantWarning = data.capabilities?.agentDrafts?.warning?.message;
+      if (grantWarning) parts.push(grantWarning);
+      setSyncMessage(parts.join(". "));
       setTimeout(() => setSyncMessage(null), 4000);
     } catch {
       setSyncMessage("Failed to sync. Check your connection.");
@@ -219,7 +218,7 @@ export function ChannelsView({
           <div>
             <h1 className="text-2xl font-bold">Channels</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Your connected social media accounts from Zernio
+              Your connected social media accounts through Agent Social Gateway
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -292,8 +291,7 @@ export function ChannelsView({
               No channels yet
             </p>
             <p className="mt-1 max-w-xs text-center text-xs text-muted-foreground/70">
-              Connect a social media account to start building flows and
-              automating conversations.
+              Provider accounts appear here after they are configured in the Gateway and synchronized.
             </p>
             <button
               onClick={() => setShowPlatformPicker(true)}
