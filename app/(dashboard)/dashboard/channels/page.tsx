@@ -10,10 +10,14 @@ export default async function ChannelsPage() {
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false });
 
+  const providerOnboardingEnabled =
+    process.env.SOCIAL_GATEWAY_PROVIDER_ONBOARDING_ENABLED === "true";
+
   return (
     <ChannelsView
       channels={channels ?? []}
       workspaceId={workspace.id}
+      providerOnboardingEnabled={providerOnboardingEnabled}
     />
   );
 }

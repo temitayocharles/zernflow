@@ -174,7 +174,7 @@ export function MessageThread({
         "postgres_changes",
         {
           event: "UPDATE",
-          schema: "public",
+          schema: "omni_channel",
           table: "conversations",
           filter: `id=eq.${conversation.id}`,
         },

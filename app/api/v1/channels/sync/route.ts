@@ -9,6 +9,7 @@ import {
 } from "@/lib/social-gateway/client";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 import { getWorkspace } from "@/lib/workspace";
+import { ensureAgentDraftGrants } from "@/lib/social-gateway/agent-grants";
 
 function gatewayFailure(error: unknown): NextResponse {
   if (error instanceof SocialGatewayConfigurationError) {
@@ -59,6 +60,8 @@ export async function POST() {
         )
         .eq("workspace_id", workspace.id),
     ]);
+
+    await ensureAgentDraftGrants(accounts.map((account) => account._id));
 
     if (existingResult.error) {
       throw new Error(`Failed to read local channels: ${existingResult.error.message}`);
