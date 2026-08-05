@@ -1,28 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
-  useEffect(() => {
-    const reason = new URLSearchParams(window.location.search).get("reason");
+  const notice = (() => {
+    const reason = searchParams.get("reason");
     if (reason === "inactive") {
-      setNotice("You were signed out after 24 hours without activity. Please sign in again.");
-    } else if (reason === "session_expired") {
-      setNotice("Your session reached its 14-day security limit. Please sign in again.");
+      return "You were signed out after 24 hours without activity. Please sign in again.";
     }
-  }, []);
+    if (reason === "session_expired") {
+      return "Your session reached its 14-day security limit. Please sign in again.";
+    }
+    return null;
+  })();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -128,5 +130,14 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
