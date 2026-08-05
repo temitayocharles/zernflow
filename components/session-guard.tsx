@@ -18,10 +18,6 @@ export function SessionGuard({ userId }: { userId: string }) {
     let signingOut = false;
 
     const storedUser = localStorage.getItem(SESSION_USER_KEY);
-    if (storedUser !== userId) {
-      localStorage.setItem(SESSION_USER_KEY, userId);
-      localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
-    }
 
     const recordActivity = () => {
       const now = Date.now();
@@ -52,9 +48,18 @@ export function SessionGuard({ userId }: { userId: string }) {
     events.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }));
     document.addEventListener("visibilitychange", recordActivity);
 
-    recordActivity();
+    const initialize = async () => {
+      if (storedUser !== userId) {
+        localStorage.setItem(SESSION_USER_KEY, userId);
+        localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+        return;
+      }
+      await enforceInactivity();
+      if (!signingOut) recordActivity();
+    };
+
     const interval = window.setInterval(enforceInactivity, 60_000);
-    void enforceInactivity();
+    void initialize();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
