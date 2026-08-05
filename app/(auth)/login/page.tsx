@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -11,8 +11,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "inactive") {
+      setNotice("You were signed out after 24 hours without activity. Please sign in again.");
+    } else if (reason === "session_expired") {
+      setNotice("Your session reached its 14-day security limit. Please sign in again.");
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -90,6 +100,12 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </div>
+
+          {notice && (
+            <p className="rounded-lg border border-border bg-accent px-3 py-2 text-sm text-foreground">
+              {notice}
+            </p>
+          )}
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>
