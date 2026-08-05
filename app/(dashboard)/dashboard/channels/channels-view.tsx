@@ -69,9 +69,11 @@ function getDmLink(platform: Platform, username: string | null): { url: string |
 
 export function ChannelsView({
   channels: initialChannels,
+  providerOnboardingEnabled,
 }: {
   channels: Channel[];
   workspaceId: string;
+  providerOnboardingEnabled: boolean;
 }) {
   const [channels, setChannels] = useState(initialChannels);
   const [syncing, setSyncing] = useState(false);
@@ -98,6 +100,12 @@ export function ChannelsView({
   }, [showPlatformPicker]);
 
   async function handleConnect(platform: Platform) {
+    if (!providerOnboardingEnabled) {
+      setSyncMessage(
+        "New channel connections require a configured Gateway provider application.",
+      );
+      return;
+    }
     setConnecting(platform);
     try {
       const res = await fetch("/api/v1/channels/connect", {
@@ -140,16 +148,15 @@ export function ChannelsView({
 
       setChannels(data.channels ?? []);
       const { created, updated, deactivated, conversationsImported = 0 } = data.synced;
-      if (created === 0 && updated === 0 && deactivated === 0 && conversationsImported === 0) {
-        setSyncMessage("All channels up to date");
-      } else {
-        const parts = [];
-        if (created > 0) parts.push(`${created} added`);
-        if (updated > 0) parts.push(`${updated} updated`);
-        if (deactivated > 0) parts.push(`${deactivated} deactivated`);
-        if (conversationsImported > 0) parts.push(`${conversationsImported} conversations imported`);
-        setSyncMessage(parts.join(", "));
-      }
+      const parts: string[] = [];
+      if (created > 0) parts.push(`${created} added`);
+      if (updated > 0) parts.push(`${updated} updated`);
+      if (deactivated > 0) parts.push(`${deactivated} deactivated`);
+      if (conversationsImported > 0) parts.push(`${conversationsImported} conversations imported`);
+      if (parts.length === 0) parts.push("All channels up to date");
+      const grantWarning = data.capabilities?.agentDrafts?.warning?.message;
+      if (grantWarning) parts.push(grantWarning);
+      setSyncMessage(parts.join(". "));
       setTimeout(() => setSyncMessage(null), 4000);
     } catch {
       setSyncMessage("Failed to sync. Check your connection.");
@@ -211,7 +218,7 @@ export function ChannelsView({
           <div>
             <h1 className="text-2xl font-bold">Channels</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Your connected social media accounts from Zernio
+              Your connected social media accounts through Agent Social Gateway
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -233,12 +240,18 @@ export function ChannelsView({
             <div className="relative" ref={pickerRef}>
               <button
                 onClick={() => setShowPlatformPicker(!showPlatformPicker)}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                disabled={!providerOnboardingEnabled}
+                title={
+                  providerOnboardingEnabled
+                    ? "Connect a channel"
+                    : "Configure a Gateway provider application first"
+                }
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" />
                 Connect Channel
               </button>
-              {showPlatformPicker && (
+              {showPlatformPicker && providerOnboardingEnabled && (
                 <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-lg">
                   {connectablePlatforms.map((p) => (
                     <button
@@ -262,6 +275,13 @@ export function ChannelsView({
         </div>
       </div>
 
+      {!providerOnboardingEnabled && (
+        <div className="border-b border-border bg-muted/40 px-5 py-3 text-sm text-muted-foreground">
+          New channel onboarding is disabled until a Gateway provider application is configured.
+          Existing Gateway accounts can still be imported with <strong>Sync</strong>.
+        </div>
+      )}
+
       {/* Channel cards */}
       <div className="flex-1 overflow-auto p-8">
         {channels.length === 0 ? (
@@ -271,15 +291,15 @@ export function ChannelsView({
               No channels yet
             </p>
             <p className="mt-1 max-w-xs text-center text-xs text-muted-foreground/70">
-              Connect a social media account to start building flows and
-              automating conversations.
+              Provider accounts appear here after they are configured in the Gateway and synchronized.
             </p>
             <button
               onClick={() => setShowPlatformPicker(true)}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+              disabled={!providerOnboardingEnabled}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
-              Connect Channel
+              {providerOnboardingEnabled ? "Connect Channel" : "Provider setup required"}
             </button>
           </div>
         ) : (

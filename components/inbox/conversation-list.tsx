@@ -63,7 +63,7 @@ export function ConversationList({
         "postgres_changes",
         {
           event: "*",
-          schema: "public",
+          schema: "omni_channel",
           table: "conversations",
           filter: `workspace_id=eq.${workspaceId}`,
         },

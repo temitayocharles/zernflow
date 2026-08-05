@@ -1,508 +1,401 @@
-import Zernio from "@zernio/node";
+import { serializeReplyInput } from "./reply";
+import type {
+  AssignmentInput,
+  DraftReplyInput,
+  GatewayAccountList,
+  GatewayActionRequest,
+  GatewayConversationControl,
+  GatewayConversationDetail,
+  GatewayConversationPage,
+  GatewayOperation,
+  GetConversationInput,
+  ListConversationsInput,
+  ReplyInput,
+  SocialGatewayClient,
+} from "./types";
 
-export type RuntimeEnv = Record<string, string | undefined>;
+type GatewayAuth = "operator" | "admin" | "agent";
+type FetchLike = typeof fetch;
 
-export type GatewayPlatform =
-  | "facebook"
-  | "instagram"
-  | "twitter"
-  | "telegram"
-  | "bluesky"
-  | "reddit";
-
-export interface GatewayResponse<T = unknown> {
-  data?: T;
-  error?: unknown;
-  status?: number;
+export interface HttpSocialGatewayClientOptions {
+  baseUrl: string;
+  operatorApiKey: string;
+  adminApiKey?: string;
+  agentCredential?: string;
+  actorRef?: string;
+  workspaceRef?: string;
+  timeoutMs?: number;
+  fetchImpl?: FetchLike;
+  production?: boolean;
 }
 
-export interface GatewayAccount {
-  _id?: string;
-  platform?: string;
-  username?: string;
-  displayName?: string;
-  profilePicture?: string;
-  [key: string]: unknown;
-}
-
-export interface GatewayWebhook {
-  _id?: string;
-  name?: string;
-  url?: string;
-  secret?: string | null;
-  events?: string[];
-}
-
-export interface SendConversationInput {
-  conversationId: string;
-  accountId: string;
-  message: string;
-  attachmentUrl?: string;
-  attachmentType?: string;
-  buttons?: unknown[];
-  quickReplies?: unknown[];
-  template?: unknown;
-  replyMarkup?: unknown;
-}
-
-export interface SocialGatewayClient {
-  profiles: {
-    list(): Promise<GatewayResponse<{ profiles?: Array<{ _id?: string }> }>>;
-  };
-  connections: {
-    getConnectUrl(input: {
-      platform: GatewayPlatform;
-      profileId: string;
-      redirectUrl: string;
-    }): Promise<GatewayResponse<{ authUrl?: string }>>;
-  };
-  accounts: {
-    list(): Promise<GatewayResponse<{ accounts?: GatewayAccount[] }>>;
-    disconnect(input: { accountId: string }): Promise<GatewayResponse>;
-  };
-  conversations: {
-    list(input: {
-      accountId: string;
-      limit: number;
-      sortOrder: "asc" | "desc";
-      cursor?: string;
-    }): Promise<
-      GatewayResponse<{
-        data?: unknown[];
-        pagination?: { hasMore?: boolean; nextCursor?: string };
-      }>
-    >;
-    messages(input: {
-      conversationId: string;
-      accountId: string;
-    }): Promise<GatewayResponse<{ messages?: unknown[]; data?: unknown[] }>>;
-    send(input: SendConversationInput): Promise<
-      GatewayResponse<{ data?: { messageId?: string }; messageId?: string }>
-    >;
-  };
-  comments: {
-    replyPublic(input: {
-      accountId: string;
-      postId: string;
-      commentId: string;
-      message: string;
-    }): Promise<GatewayResponse>;
-    replyPrivate(input: {
-      accountId: string;
-      postId: string;
-      commentId: string;
-      message: string;
-    }): Promise<GatewayResponse>;
-  };
-  webhooks: {
-    list(): Promise<GatewayResponse<{ webhooks?: GatewayWebhook[] }>>;
-    create(input: {
-      name: string;
-      url: string;
-      secret: string;
-      events: string[];
-    }): Promise<GatewayResponse>;
-    update(input: {
-      id: string;
-      name: string;
-      url: string;
-      secret: string;
-      events: string[];
-    }): Promise<GatewayResponse>;
+interface GatewayErrorEnvelope {
+  detail?: {
+    code?: unknown;
+    message?: unknown;
   };
 }
 
-type SdkResponse<T = unknown> = {
-  data?: T;
-  error?: unknown;
-  response?: { status?: number };
-};
+export class SocialGatewayError extends Error {
+  readonly code: string;
+  readonly status: number | null;
+  readonly retryable: boolean;
 
-function normalize<T = unknown>(response: unknown): GatewayResponse<T> {
-  const typed = response as SdkResponse<T>;
-  return {
-    data: typed.data,
-    error: typed.error,
-    status: typed.response?.status,
-  };
+  constructor(
+    code: string,
+    message: string,
+    options: { status?: number | null; retryable?: boolean; cause?: unknown } = {},
+  ) {
+    super(message, { cause: options.cause });
+    this.name = "SocialGatewayError";
+    this.code = code;
+    this.status = options.status ?? null;
+    this.retryable = options.retryable ?? false;
+  }
 }
 
-function normalizeBaseUrl(value: string): string {
-  const normalized = value.trim().replace(/\/$/, "");
-  const parsed = new URL(normalized);
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('SOCIAL_GATEWAY_BASE_URL must use HTTP or HTTPS');
+export class SocialGatewayConfigurationError extends SocialGatewayError {
+  constructor(message: string) {
+    super("social_gateway_not_configured", message);
+    this.name = "SocialGatewayConfigurationError";
+  }
+}
+
+function validateBaseUrl(rawValue: string, production: boolean): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawValue);
+  } catch {
+    throw new SocialGatewayConfigurationError(
+      "SOCIAL_GATEWAY_BASE_URL must be an absolute HTTP(S) URL",
+    );
+  }
+
+  if (!new Set(["http:", "https:"]).has(parsed.protocol)) {
+    throw new SocialGatewayConfigurationError(
+      "SOCIAL_GATEWAY_BASE_URL must use HTTP or HTTPS",
+    );
+  }
+  if (parsed.username || parsed.password || parsed.hash) {
+    throw new SocialGatewayConfigurationError(
+      "SOCIAL_GATEWAY_BASE_URL cannot contain credentials or a fragment",
+    );
+  }
+
+  const isLoopback = new Set(["localhost", "127.0.0.1", "::1"]).has(parsed.hostname);
+  if (production && parsed.protocol !== "https:" && !isLoopback) {
+    throw new SocialGatewayConfigurationError(
+      "SOCIAL_GATEWAY_BASE_URL must use HTTPS in production",
+    );
+  }
+
+  parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+  return parsed;
+}
+
+function normalizeCredential(value: string | undefined, name: string): string {
+  const normalized = value?.trim() ?? "";
+  if (normalized.length < 24) {
+    throw new SocialGatewayConfigurationError(`${name} must contain at least 24 characters`);
   }
   return normalized;
 }
 
-async function parseResponse(response: Response): Promise<unknown> {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) return response.json();
-  const text = await response.text();
-  return text ? { message: text.slice(0, 2048) } : undefined;
-}
-
-export class AgentSocialGatewayHttpAdapter implements SocialGatewayClient {
-  private readonly baseUrl: string;
-  private readonly apiKey: string;
-
-  constructor(input: { baseUrl: string; apiKey: string }) {
-    this.baseUrl = normalizeBaseUrl(input.baseUrl);
-    this.apiKey = input.apiKey.trim();
-    if (!this.apiKey) throw new Error('SOCIAL_GATEWAY_API_KEY is required');
-  }
-
-  private async request<T>(path: string, init?: RequestInit): Promise<GatewayResponse<T>> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey,
-        ...(init?.headers || {}),
-      },
-    });
-    const payload = await parseResponse(response);
-    if (!response.ok) {
-      return { error: payload, status: response.status };
+function appendQuery(url: URL, values: Record<string, string | number | undefined>): void {
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined && value !== "") {
+      url.searchParams.set(key, String(value));
     }
-    return { data: payload as T, status: response.status };
   }
-
-  readonly profiles = {
-    list: () => this.request<{ profiles?: Array<{ _id?: string }> }>('/v1/profiles'),
-  };
-
-  readonly connections = {
-    getConnectUrl: (input: {
-      platform: GatewayPlatform;
-      profileId: string;
-      redirectUrl: string;
-    }) =>
-      this.request<{ authUrl?: string }>(
-        `/v1/connections/${encodeURIComponent(input.platform)}`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            profile_id: input.profileId,
-            redirect_url: input.redirectUrl,
-          }),
-        },
-      ),
-  };
-
-  readonly accounts = {
-    list: () => this.request<{ accounts?: GatewayAccount[] }>('/v1/accounts'),
-    disconnect: (input: { accountId: string }) =>
-      this.request(`/v1/accounts/${encodeURIComponent(input.accountId)}`, {
-        method: 'DELETE',
-      }),
-  };
-
-  readonly conversations = {
-    list: (input: {
-      accountId: string;
-      limit: number;
-      sortOrder: 'asc' | 'desc';
-      cursor?: string;
-    }) => {
-      const query = new URLSearchParams({
-        limit: String(input.limit),
-        sort_order: input.sortOrder,
-      });
-      if (input.cursor) query.set('cursor', input.cursor);
-      return this.request<{
-        data?: unknown[];
-        pagination?: { hasMore?: boolean; nextCursor?: string };
-      }>(
-        `/v1/accounts/${encodeURIComponent(input.accountId)}/conversations?${query.toString()}`,
-      );
-    },
-    messages: (input: { conversationId: string; accountId: string }) =>
-      this.request<{ messages?: unknown[]; data?: unknown[] }>(
-        `/v1/accounts/${encodeURIComponent(input.accountId)}/conversations/${encodeURIComponent(input.conversationId)}/messages`,
-      ),
-    send: (input: SendConversationInput) =>
-      this.request<{ data?: { messageId?: string }; messageId?: string }>(
-        `/v1/accounts/${encodeURIComponent(input.accountId)}/conversations/${encodeURIComponent(input.conversationId)}/messages`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            message: input.message,
-            attachment_url: input.attachmentUrl,
-            attachment_type: input.attachmentType,
-            buttons: input.buttons,
-            quick_replies: input.quickReplies,
-            template: input.template,
-            reply_markup: input.replyMarkup,
-          }),
-        },
-      ),
-  };
-
-  readonly comments = {
-    replyPublic: (input: {
-      accountId: string;
-      postId: string;
-      commentId: string;
-      message: string;
-    }) =>
-      this.request(
-        `/v1/accounts/${encodeURIComponent(input.accountId)}/comments/${encodeURIComponent(input.commentId)}/replies`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ post_id: input.postId, message: input.message }),
-        },
-      ),
-    replyPrivate: (input: {
-      accountId: string;
-      postId: string;
-      commentId: string;
-      message: string;
-    }) =>
-      this.request(
-        `/v1/accounts/${encodeURIComponent(input.accountId)}/comments/${encodeURIComponent(input.commentId)}/private-replies`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ post_id: input.postId, message: input.message }),
-        },
-      ),
-  };
-
-  readonly webhooks = {
-    list: () => this.request<{ webhooks?: GatewayWebhook[] }>('/v1/webhooks'),
-    create: (input: {
-      name: string;
-      url: string;
-      secret: string;
-      events: string[];
-    }) => this.request('/v1/webhooks', { method: 'POST', body: JSON.stringify(input) }),
-    update: (input: {
-      id: string;
-      name: string;
-      url: string;
-      secret: string;
-      events: string[];
-    }) =>
-      this.request(`/v1/webhooks/${encodeURIComponent(input.id)}`, {
-        method: 'PUT',
-        body: JSON.stringify(input),
-      }),
-  };
 }
 
-/**
- * Temporary hosted compatibility adapter. It is the only module allowed to
- * import `@zernio/node`; callers depend on the provider-neutral interface.
- */
-export class ZernioCompatibilityAdapter implements SocialGatewayClient {
-  private readonly sdk: Zernio;
+async function readError(response: Response): Promise<{ code: string; message: string }> {
+  const fallback = {
+    code: `social_gateway_http_${response.status}`,
+    message: "Social gateway request failed",
+  };
 
-  constructor(apiKey: string) {
-    this.sdk = new Zernio({ apiKey });
+  try {
+    const body = (await response.json()) as GatewayErrorEnvelope;
+    const code = typeof body.detail?.code === "string" ? body.detail.code : fallback.code;
+    const message =
+      typeof body.detail?.message === "string" ? body.detail.message : fallback.message;
+    return { code, message };
+  } catch {
+    return fallback;
   }
-
-  readonly profiles = {
-    list: async () =>
-      normalize<{ profiles?: Array<{ _id?: string }> }>(
-        await this.sdk.profiles.listProfiles()
-      ),
-  };
-
-  readonly connections = {
-    getConnectUrl: async (input: {
-      platform: GatewayPlatform;
-      profileId: string;
-      redirectUrl: string;
-    }) =>
-      normalize<{ authUrl?: string }>(
-        await this.sdk.connect.getConnectUrl({
-          path: { platform: input.platform },
-          query: {
-            profileId: input.profileId,
-            redirect_url: input.redirectUrl,
-          },
-        })
-      ),
-  };
-
-  readonly accounts = {
-    list: async () =>
-      normalize<{ accounts?: GatewayAccount[] }>(
-        await this.sdk.accounts.listAccounts()
-      ),
-    disconnect: async (input: { accountId: string }) =>
-      normalize(
-        await this.sdk.accounts.deleteAccount({
-          path: { accountId: input.accountId },
-        })
-      ),
-  };
-
-  readonly conversations = {
-    list: async (input: {
-      accountId: string;
-      limit: number;
-      sortOrder: "asc" | "desc";
-      cursor?: string;
-    }) =>
-      normalize<{
-        data?: unknown[];
-        pagination?: { hasMore?: boolean; nextCursor?: string };
-      }>(
-        await this.sdk.messages.listInboxConversations({
-          query: input,
-        })
-      ),
-    messages: async (input: { conversationId: string; accountId: string }) =>
-      normalize<{ messages?: unknown[]; data?: unknown[] }>(
-        await this.sdk.messages.getInboxConversationMessages({
-          path: { conversationId: input.conversationId },
-          query: { accountId: input.accountId },
-        })
-      ),
-    send: async (input: SendConversationInput) => {
-      const {
-        conversationId,
-        accountId,
-        message,
-        attachmentUrl,
-        attachmentType,
-        buttons,
-        quickReplies,
-        template,
-        replyMarkup,
-      } = input;
-      const body: Record<string, unknown> = { accountId, message };
-      if (attachmentUrl !== undefined) body.attachmentUrl = attachmentUrl;
-      if (attachmentType !== undefined) body.attachmentType = attachmentType;
-      if (buttons !== undefined) body.buttons = buttons;
-      if (quickReplies !== undefined) body.quickReplies = quickReplies;
-      if (template !== undefined) body.template = template;
-      if (replyMarkup !== undefined) body.replyMarkup = replyMarkup;
-
-      return normalize<{ data?: { messageId?: string }; messageId?: string }>(
-        await this.sdk.messages.sendInboxMessage({
-          path: { conversationId },
-          body: body as never,
-        })
-      );
-    },
-  };
-
-  readonly comments = {
-    replyPublic: async (input: {
-      accountId: string;
-      postId: string;
-      commentId: string;
-      message: string;
-    }) =>
-      normalize(
-        await this.sdk.comments.replyToInboxPost({
-          path: { postId: input.postId },
-          body: {
-            accountId: input.accountId,
-            commentId: input.commentId,
-            message: input.message,
-          },
-        })
-      ),
-    replyPrivate: async (input: {
-      accountId: string;
-      postId: string;
-      commentId: string;
-      message: string;
-    }) =>
-      normalize(
-        await this.sdk.comments.sendPrivateReplyToComment({
-          path: { postId: input.postId, commentId: input.commentId },
-          body: { accountId: input.accountId, message: input.message },
-        })
-      ),
-  };
-
-  readonly webhooks = {
-    list: async () =>
-      normalize<{ webhooks?: GatewayWebhook[] }>(
-        await this.sdk.webhooks.getWebhookSettings()
-      ),
-    create: async (input: {
-      name: string;
-      url: string;
-      secret: string;
-      events: string[];
-    }) =>
-      normalize(
-        await this.sdk.webhooks.createWebhookSettings({
-          body: input,
-        })
-      ),
-    update: async (input: {
-      id: string;
-      name: string;
-      url: string;
-      secret: string;
-      events: string[];
-    }) =>
-      normalize(
-        await this.sdk.webhooks.updateWebhookSettings({
-          body: {
-            _id: input.id,
-            name: input.name,
-            url: input.url,
-            secret: input.secret,
-            events: input.events,
-          },
-        })
-      ),
-  };
 }
 
-export type SocialGatewayDriver = 'agent' | 'zernio';
+export class HttpSocialGatewayClient implements SocialGatewayClient {
+  private readonly baseUrl: URL;
+  private readonly operatorApiKey: string;
+  private readonly adminApiKey?: string;
+  private readonly agentCredential?: string;
+  private readonly actorRef: string;
+  private readonly workspaceRef: string;
+  private readonly timeoutMs: number;
+  private readonly fetchImpl: FetchLike;
 
-export interface SocialGatewayRuntimeStatus {
-  driver: SocialGatewayDriver;
-  configured: boolean;
-  endpoint?: string;
-}
+  constructor(options: HttpSocialGatewayClientOptions) {
+    this.baseUrl = validateBaseUrl(options.baseUrl, options.production ?? false);
+    this.operatorApiKey = normalizeCredential(options.operatorApiKey, "operatorApiKey");
+    this.adminApiKey = options.adminApiKey?.trim() || undefined;
+    this.agentCredential = options.agentCredential?.trim() || undefined;
+    this.actorRef = options.actorRef?.trim() || "zernflow";
+    this.workspaceRef = options.workspaceRef?.trim() || "default";
+    this.timeoutMs = options.timeoutMs ?? 10_000;
+    this.fetchImpl = options.fetchImpl ?? fetch;
 
-export function getSocialGatewayRuntimeStatus(
-  env: RuntimeEnv = process.env,
-): SocialGatewayRuntimeStatus {
-  const driver = (env.SOCIAL_GATEWAY_DRIVER || 'agent').trim().toLowerCase();
-  if (driver === 'zernio') {
-    return {
-      driver: 'zernio',
-      configured: Boolean(env.ZERNIO_API_KEY?.trim()),
-    };
-  }
-  return {
-    driver: 'agent',
-    configured: Boolean(
-      env.SOCIAL_GATEWAY_BASE_URL?.trim() && env.SOCIAL_GATEWAY_API_KEY?.trim(),
-    ),
-    endpoint: env.SOCIAL_GATEWAY_BASE_URL?.trim(),
-  };
-}
-
-export function createSocialGatewayClient(
-  env: RuntimeEnv = process.env,
-): SocialGatewayClient {
-  const status = getSocialGatewayRuntimeStatus(env);
-  if (status.driver === 'zernio') {
-    const apiKey = env.ZERNIO_API_KEY?.trim();
-    if (!apiKey) throw new Error('ZERNIO_API_KEY is not configured');
-    return new ZernioCompatibilityAdapter(apiKey);
+    if (!Number.isInteger(this.timeoutMs) || this.timeoutMs < 100 || this.timeoutMs > 60_000) {
+      throw new SocialGatewayConfigurationError("timeoutMs must be between 100 and 60000");
+    }
+    if (this.adminApiKey) {
+      normalizeCredential(this.adminApiKey, "adminApiKey");
+    }
+    if (this.agentCredential) {
+      normalizeCredential(this.agentCredential, "agentCredential");
+    }
   }
 
-  const baseUrl = env.SOCIAL_GATEWAY_BASE_URL?.trim();
-  const apiKey = env.SOCIAL_GATEWAY_API_KEY?.trim();
-  if (!baseUrl || !apiKey) {
-    throw new Error(
-      'SOCIAL_GATEWAY_BASE_URL and SOCIAL_GATEWAY_API_KEY must be injected by the runtime secret manager',
+  async listAccounts(): Promise<GatewayAccountList> {
+    return this.request<GatewayAccountList>("/v1/accounts", { auth: "operator" });
+  }
+
+  async listConversations(
+    input: ListConversationsInput = {},
+  ): Promise<GatewayConversationPage> {
+    const url = this.url("/v1/conversations");
+    appendQuery(url, {
+      limit: input.limit,
+      cursor: input.cursor,
+      provider: input.provider,
+      kind: input.kind,
+    });
+    return this.requestUrl<GatewayConversationPage>(url, { auth: "operator" });
+  }
+
+  async getConversation(
+    conversationId: string,
+    input: GetConversationInput = {},
+  ): Promise<GatewayConversationDetail> {
+    const url = this.url(`/v1/conversations/${encodeURIComponent(conversationId)}`);
+    appendQuery(url, {
+      message_limit: input.messageLimit,
+      message_cursor: input.messageCursor,
+    });
+    return this.requestUrl<GatewayConversationDetail>(url, { auth: "operator" });
+  }
+
+  async replyToConversation(
+    conversationId: string,
+    input: ReplyInput,
+  ): Promise<GatewayOperation> {
+    return this.request<GatewayOperation>(
+      `/v1/conversations/${encodeURIComponent(conversationId)}/replies`,
+      {
+        auth: "operator",
+        method: "POST",
+        body: serializeReplyInput(input),
+      },
     );
   }
-  return new AgentSocialGatewayHttpAdapter({ baseUrl, apiKey });
+
+  async createDraft(
+    conversationId: string,
+    input: DraftReplyInput,
+  ): Promise<GatewayActionRequest> {
+    return this.request<GatewayActionRequest>(
+      `/v1/conversations/${encodeURIComponent(conversationId)}/drafts`,
+      {
+        auth: "agent",
+        method: "POST",
+        body: {
+          text: input.text,
+          idempotency_key: input.idempotencyKey,
+          reply_to_message_id: input.replyToMessageId ?? null,
+          risk_level: input.riskLevel ?? "medium",
+        },
+      },
+    );
+  }
+
+  async assignConversation(
+    conversationId: string,
+    input: AssignmentInput,
+  ): Promise<GatewayConversationControl> {
+    return this.request<GatewayConversationControl>(
+      `/v1/conversations/${encodeURIComponent(conversationId)}/assignment`,
+      {
+        auth: "operator",
+        method: "POST",
+        body: {
+          assignment_type: input.assignmentType,
+          assignee_ref: input.assigneeRef ?? null,
+        },
+      },
+    );
+  }
+
+  async escalateConversation(
+    conversationId: string,
+    reason: string,
+  ): Promise<GatewayConversationControl> {
+    return this.request<GatewayConversationControl>(
+      `/v1/conversations/${encodeURIComponent(conversationId)}/escalate`,
+      { auth: "operator", method: "POST", body: { reason } },
+    );
+  }
+
+  async setHumanTakeover(
+    conversationId: string,
+    enabled: boolean,
+    reason?: string,
+  ): Promise<GatewayConversationControl> {
+    return this.request<GatewayConversationControl>(
+      `/v1/admin/conversations/${encodeURIComponent(conversationId)}/human-takeover`,
+      {
+        auth: "admin",
+        method: "POST",
+        body: { enabled, reason: reason ?? null },
+      },
+    );
+  }
+
+  async approveAction(requestId: string, reason?: string): Promise<GatewayActionRequest> {
+    return this.reviewAction(requestId, "approve", reason);
+  }
+
+  async rejectAction(requestId: string, reason?: string): Promise<GatewayActionRequest> {
+    return this.reviewAction(requestId, "reject", reason);
+  }
+
+  async getOperation(operationId: string): Promise<GatewayOperation> {
+    return this.request<GatewayOperation>(
+      `/v1/operations/${encodeURIComponent(operationId)}`,
+      { auth: "operator" },
+    );
+  }
+
+  async retryOperation(operationId: string): Promise<GatewayOperation> {
+    return this.request<GatewayOperation>(
+      `/v1/operations/${encodeURIComponent(operationId)}/retry`,
+      { auth: "operator", method: "POST" },
+    );
+  }
+
+  private async reviewAction(
+    requestId: string,
+    action: "approve" | "reject",
+    reason?: string,
+  ): Promise<GatewayActionRequest> {
+    return this.request<GatewayActionRequest>(
+      `/v1/admin/agent-action-requests/${encodeURIComponent(requestId)}/${action}`,
+      { auth: "admin", method: "POST", body: { reason: reason ?? null } },
+    );
+  }
+
+  private url(path: string): URL {
+    return new URL(`${this.baseUrl.pathname}${path}`.replace(/\/+/g, "/"), this.baseUrl);
+  }
+
+  private async request<T>(
+    path: string,
+    options: {
+      auth: GatewayAuth;
+      method?: "GET" | "POST" | "PUT" | "DELETE";
+      body?: Record<string, unknown>;
+    },
+  ): Promise<T> {
+    return this.requestUrl<T>(this.url(path), options);
+  }
+
+  private async requestUrl<T>(
+    url: URL,
+    options: {
+      auth: GatewayAuth;
+      method?: "GET" | "POST" | "PUT" | "DELETE";
+      body?: Record<string, unknown>;
+    },
+  ): Promise<T> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const response = await this.fetchImpl(url, {
+        method: options.method ?? "GET",
+        headers: this.headers(options.auth, options.body !== undefined),
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const error = await readError(response);
+        throw new SocialGatewayError(error.code, error.message, {
+          status: response.status,
+          retryable:
+            response.status === 408 ||
+            response.status === 425 ||
+            response.status === 429 ||
+            response.status >= 500,
+        });
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof SocialGatewayError) {
+        throw error;
+      }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new SocialGatewayError(
+          "social_gateway_timeout",
+          "Social gateway request timed out",
+          { retryable: true, cause: error },
+        );
+      }
+      throw new SocialGatewayError(
+        "social_gateway_unavailable",
+        "Social gateway is unavailable",
+        { retryable: true, cause: error },
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private headers(auth: GatewayAuth, hasBody: boolean): Headers {
+    const headers = new Headers({
+      Accept: "application/json",
+      "X-Workspace-Ref": this.workspaceRef,
+    });
+    if (hasBody) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    if (auth === "operator") {
+      headers.set("X-API-Key", this.operatorApiKey);
+      headers.set("X-Actor-Ref", this.actorRef);
+      return headers;
+    }
+    if (auth === "admin") {
+      if (!this.adminApiKey) {
+        throw new SocialGatewayConfigurationError(
+          "SOCIAL_GATEWAY_ADMIN_API_KEY is required for administrator actions",
+        );
+      }
+      headers.set("X-Admin-API-Key", this.adminApiKey);
+      headers.set("X-Admin-Actor", this.actorRef);
+      return headers;
+    }
+    if (!this.agentCredential) {
+      throw new SocialGatewayConfigurationError(
+        "SOCIAL_GATEWAY_AGENT_CREDENTIAL is required for agent actions",
+      );
+    }
+    headers.set("Authorization", `Bearer ${this.agentCredential}`);
+    return headers;
+  }
 }

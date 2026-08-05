@@ -2,24 +2,30 @@
   "name": "zernflow",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "npm": ">=11.0.0"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:production": "node scripts/production-smoke.mjs"
   },
   "dependencies": {
+    "@zernio/node": "^0.2.0",
     "@icons-pack/react-simple-icons": "^13.11.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "@xyflow/react": "^12.10.0",
-    "@zernio/node": "^0.2.0",
-    "ai": "7.0.47",
+    "ai": "^6.0.85",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
-    "next": "16.2.12",
+    "next": "^16.1.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tailwind-merge": "^3.4.0"
@@ -32,14 +38,9 @@
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.6",
     "pg": "^8.18.0",
-    "postcss": "8.5.25",
+    "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
-  },
-  "overrides": {
-    "postcss": "8.5.25",
-    "sharp": "0.35.3",
-    "ws": "8.21.1"
   }
 }

@@ -59,7 +59,11 @@ export type NodeType =
   | "enrollSequence";
 
 export type SequenceStatus = "draft" | "active" | "paused";
-export type SequenceEnrollmentStatus = "active" | "completed" | "cancelled";
+export type SequenceEnrollmentStatus =
+  | "active"
+  | "completed"
+  | "cancelled"
+  | "failed";
 
 export interface SequenceStep {
   type: "message" | "delay";
@@ -77,6 +81,8 @@ export interface Database {
           id: string;
           name: string;
           slug: string;
+          late_api_key_encrypted: string | null;
+          ai_api_key: string | null;
           ai_provider: string;
           global_keywords: Json | null;
           created_at: string;
@@ -86,6 +92,8 @@ export interface Database {
           id?: string;
           name: string;
           slug: string;
+          late_api_key_encrypted?: string | null;
+          ai_api_key?: string | null;
           ai_provider?: string;
           global_keywords?: Json | null;
           created_at?: string;
@@ -95,6 +103,8 @@ export interface Database {
           id?: string;
           name?: string;
           slug?: string;
+          late_api_key_encrypted?: string | null;
+          ai_api_key?: string | null;
           ai_provider?: string;
           global_keywords?: Json | null;
           updated_at?: string;
@@ -137,6 +147,7 @@ export interface Database {
           display_name: string | null;
           profile_picture: string | null;
           webhook_id: string | null;
+          webhook_secret: string | null;
           is_active: boolean;
           last_comment_cursor: string | null;
           comment_rules: Json | null;
@@ -152,6 +163,7 @@ export interface Database {
           display_name?: string | null;
           profile_picture?: string | null;
           webhook_id?: string | null;
+          webhook_secret?: string | null;
           is_active?: boolean;
           last_comment_cursor?: string | null;
           comment_rules?: Json | null;
@@ -165,6 +177,7 @@ export interface Database {
           display_name?: string | null;
           profile_picture?: string | null;
           webhook_id?: string | null;
+          webhook_secret?: string | null;
           is_active?: boolean;
           last_comment_cursor?: string | null;
           comment_rules?: Json | null;
@@ -807,6 +820,7 @@ export interface Database {
           attempts: number;
           last_error: string | null;
           claimed_at: string | null;
+          dedupe_key: string | null;
           created_at: string;
         };
         Insert: {
@@ -818,6 +832,7 @@ export interface Database {
           attempts?: number;
           last_error?: string | null;
           claimed_at?: string | null;
+          dedupe_key?: string | null;
           created_at?: string;
         };
         Update: {
@@ -825,6 +840,7 @@ export interface Database {
           attempts?: number;
           last_error?: string | null;
           claimed_at?: string | null;
+          dedupe_key?: string | null;
         };
         Relationships: [];
       };
@@ -968,13 +984,37 @@ export interface Database {
         Row: {
           event_id: string;
           received_at: string;
+          source: "zernio" | "social_gateway";
+          delivery_id: string | null;
+          event_type: string | null;
+          status: "processing" | "completed" | "failed";
+          attempt_count: number;
+          claimed_at: string;
+          completed_at: string | null;
+          last_error: string | null;
         };
         Insert: {
           event_id: string;
           received_at?: string;
+          source?: "zernio" | "social_gateway";
+          delivery_id?: string | null;
+          event_type?: string | null;
+          status?: "processing" | "completed" | "failed";
+          attempt_count?: number;
+          claimed_at?: string;
+          completed_at?: string | null;
+          last_error?: string | null;
         };
         Update: {
           received_at?: string;
+          source?: "zernio" | "social_gateway";
+          delivery_id?: string | null;
+          event_type?: string | null;
+          status?: "processing" | "completed" | "failed";
+          attempt_count?: number;
+          claimed_at?: string;
+          completed_at?: string | null;
+          last_error?: string | null;
         };
         Relationships: [];
       };
@@ -1027,6 +1067,9 @@ export interface Database {
           enrolled_at: string;
           next_step_at: string | null;
           completed_at: string | null;
+          current_operation_id: string | null;
+          operation_checks: number;
+          last_error: string | null;
         };
         Insert: {
           id?: string;
@@ -1038,12 +1081,18 @@ export interface Database {
           enrolled_at?: string;
           next_step_at?: string | null;
           completed_at?: string | null;
+          current_operation_id?: string | null;
+          operation_checks?: number;
+          last_error?: string | null;
         };
         Update: {
           current_step_index?: number;
           status?: SequenceEnrollmentStatus;
           next_step_at?: string | null;
           completed_at?: string | null;
+          current_operation_id?: string | null;
+          operation_checks?: number;
+          last_error?: string | null;
         };
         Relationships: [
           {
@@ -1090,6 +1139,25 @@ export interface Database {
       increment_broadcast_failed: {
         Args: {
           b_id: string;
+        };
+        Returns: undefined;
+      };
+      claim_social_gateway_webhook: {
+        Args: {
+          p_event_id: string;
+          p_delivery_id: string;
+          p_event_type: string;
+          p_channel_id: string;
+          p_envelope: Json;
+        };
+        Returns: string;
+      };
+      apply_social_gateway_inbound_conversation: {
+        Args: {
+          p_conversation_id: string;
+          p_occurred_at: string;
+          p_preview: string;
+          p_gateway_conversation_id: string | null;
         };
         Returns: undefined;
       };

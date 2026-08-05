@@ -8,7 +8,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SocialGatewayClient } from "./social-gateway/client";
+import type { Zernio } from "./zernio-client";
 
 /** Cap per channel: 4 pages x 50 conversations. */
 const MAX_PAGES_PER_CHANNEL = 4;
@@ -117,12 +117,12 @@ export async function upsertContactForSender({
  */
 export async function backfillInboxConversations({
   supabase,
-  gateway,
+  zernio,
   workspaceId,
   channels,
 }: {
   supabase: SupabaseClient;
-  gateway: SocialGatewayClient;
+  zernio: Zernio;
   workspaceId: string;
   channels: BackfillChannel[];
 }): Promise<{ imported: number }> {
@@ -130,7 +130,7 @@ export async function backfillInboxConversations({
 
   for (const channel of channels) {
     try {
-      imported += await backfillChannel({ supabase, gateway, workspaceId, channel });
+      imported += await backfillChannel({ supabase, zernio, workspaceId, channel });
     } catch (err) {
       console.error(
         `[inbox-sync] backfill failed for channel ${channel.id} (${channel.platform}):`,
@@ -144,12 +144,12 @@ export async function backfillInboxConversations({
 
 async function backfillChannel({
   supabase,
-  gateway,
+  zernio,
   workspaceId,
   channel,
 }: {
   supabase: SupabaseClient;
-  gateway: SocialGatewayClient;
+  zernio: Zernio;
   workspaceId: string;
   channel: BackfillChannel;
 }): Promise<number> {
@@ -169,11 +169,13 @@ async function backfillChannel({
   const seenParticipants = new Set<string>();
 
   for (let page = 0; page < MAX_PAGES_PER_CHANNEL; page++) {
-    const res = await gateway.conversations.list({
-      accountId: channel.late_account_id,
-      limit: PAGE_SIZE,
-      sortOrder: "desc",
-      cursor,
+    const res = await zernio.messages.listInboxConversations({
+      query: {
+        accountId: channel.late_account_id,
+        limit: PAGE_SIZE,
+        sortOrder: "desc",
+        cursor,
+      },
     });
 
     const conversations = (res.data?.data ?? []) as ZernioInboxConversation[];

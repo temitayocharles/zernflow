@@ -1,0 +1,64 @@
+name: ZernFlow CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ["forgejo-general"]
+    container:
+      image: node:24-bookworm
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+      CRON_SECRET: ci-cron-secret-with-at-least-24-characters
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+    steps:
+      - name: Fetch source
+        shell: sh
+        run: |
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends git
+          git config --global --add safe.directory "$PWD"
+          git init .
+          git remote add origin "${FORGEJO_SERVER_URL:-${GITHUB_SERVER_URL}}/${FORGEJO_REPOSITORY:-${GITHUB_REPOSITORY}}.git"
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "${token}"
+          git -c http.extraHeader="Authorization: token ${token}" fetch --depth=1 origin "${FORGEJO_REF:-${GITHUB_REF}}"
+          git checkout --detach FETCH_HEAD
+
+      - name: Install locked dependencies
+        shell: sh
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit production dependencies
+        shell: sh
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Lint
+        shell: sh
+        run: npm run lint
+
+      - name: Typecheck
+        shell: sh
+        run: npm run typecheck
+
+      - name: Test
+        shell: sh
+        run: npm test
+
+      - name: Production build
+        shell: sh
+        run: npm run build
