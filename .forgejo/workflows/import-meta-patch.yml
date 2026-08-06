@@ -1,0 +1,30 @@
+name: Import verified Meta patch
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: forgejo-general
+    container:
+      image: node:24-bookworm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/meta-owner-oauth-2026-08-06
+          fetch-depth: 1
+      - name: Apply and push verified patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends curl ca-certificates
+          curl -fL --retry 4 --retry-all-errors https://backend.composio.dev/api/v3/sl/YNwEVa9zED -o /tmp/patch.tgz
+          echo 'eda236d5cf677098dfe6e0b6da009714eef9faa91733fd3ae6933af58bcec3e7  /tmp/patch.tgz' | sha256sum -c -
+          tar -xzf /tmp/patch.tgz -C .
+          rm -f .forgejo/workflows/import-meta-patch.yml
+          git config user.name 'Forgejo Meta Transplant'
+          git config user.email 'meta-transplant@users.noreply.forgejo'
+          git add -A
+          git diff --cached --quiet && exit 1
+          git commit -m 'feat: enable readiness-gated Meta channel onboarding'
+          git push origin HEAD:feature/meta-owner-oauth-2026-08-06
