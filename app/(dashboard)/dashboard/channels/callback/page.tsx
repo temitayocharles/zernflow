@@ -13,10 +13,17 @@ export default function ChannelCallbackPage() {
   useEffect(() => {
     async function syncAndRedirect() {
       const connected = searchParams.get("connected");
+      const error = searchParams.get("error");
 
       if (!connected) {
         setStatus("error");
-        setMessage("Connection was cancelled or failed.");
+        setMessage(
+          error === "meta_oauth_asset_selection_required"
+            ? "More than one compatible Meta account was found. Account selection is required."
+            : error === "meta_authorization_denied"
+              ? "Meta authorization was cancelled."
+              : "Connection was cancelled or could not be completed.",
+        );
         setTimeout(() => router.push("/dashboard/channels"), 2000);
         return;
       }
