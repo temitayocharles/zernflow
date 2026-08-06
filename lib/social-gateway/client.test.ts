@@ -187,3 +187,56 @@ describe("HttpSocialGatewayClient", () => {
     ).toThrow(SocialGatewayConfigurationError);
   });
 });
+
+describe("HttpSocialGatewayClient Meta onboarding", () => {
+  it("reads readiness and starts connection through the operator boundary", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          provider: "meta",
+          configured: true,
+          platforms: ["facebook", "instagram"],
+          reason: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authUrl: "https://gateway.example.test/v1/connections/sessions/1/authorize?state=opaque",
+          session_id: "1",
+          expires_at: "2026-08-06T07:00:00Z",
+        }),
+      );
+    const client = new HttpSocialGatewayClient({
+      baseUrl: "https://gateway.example.test",
+      operatorApiKey: OPERATOR_KEY,
+      fetchImpl: fetchMock as typeof fetch,
+      production: true,
+    });
+
+    await client.getProviderReadiness();
+    await client.startConnection({
+      platform: "instagram",
+      profileId: "workspace-1",
+      redirectUrl: "https://app.zernflow.com/dashboard/channels/callback",
+    });
+
+    const [readinessUrl, readinessInit] = fetchMock.mock.calls[0] as unknown as [
+      URL,
+      RequestInit,
+    ];
+    expect(readinessUrl.pathname).toBe("/v1/connections/readiness");
+    expect(new Headers(readinessInit.headers).get("X-API-Key")).toBe(OPERATOR_KEY);
+
+    const [connectUrl, connectInit] = fetchMock.mock.calls[1] as unknown as [
+      URL,
+      RequestInit,
+    ];
+    expect(connectUrl.pathname).toBe("/v1/connections/instagram");
+    expect(JSON.parse(String(connectInit.body))).toEqual({
+      profile_id: "workspace-1",
+      redirect_url: "https://app.zernflow.com/dashboard/channels/callback",
+    });
+    expect(String(connectInit.body)).not.toContain("access_token");
+  });
+});
