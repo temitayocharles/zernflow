@@ -16,12 +16,12 @@ export default async function ChannelsPage() {
   try {
     const gateway = getSocialGatewayClient();
     const readiness = gateway ? await gateway.getProviderReadiness("meta") : null;
-    onboardingPlatforms = readiness?.configured
-      ? readiness.platforms.filter(
-          (platform): platform is Platform =>
-            platform === "facebook" || platform === "instagram",
-        )
-      : [];
+    if (readiness?.configured) {
+      onboardingPlatforms = [
+        ...(readiness.platforms.includes("facebook") ? (["facebook"] as Platform[]) : []),
+        ...(readiness.platforms.includes("instagram") ? (["instagram"] as Platform[]) : []),
+      ];
+    }
   } catch {
     // The Channels page remains available when the external Gateway is unavailable.
     onboardingPlatforms = [];
