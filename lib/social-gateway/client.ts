@@ -8,10 +8,13 @@ import type {
   GatewayConversationDetail,
   GatewayConversationPage,
   GatewayOperation,
+  GatewayProviderReadiness,
+  GatewayConnectionResponse,
   GetConversationInput,
   ListConversationsInput,
   ReplyInput,
   SocialGatewayClient,
+  StartConnectionInput,
 } from "./types";
 
 type GatewayAuth = "operator" | "admin" | "agent";
@@ -155,6 +158,26 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
     if (this.agentCredential) {
       normalizeCredential(this.agentCredential, "agentCredential");
     }
+  }
+
+  async getProviderReadiness(): Promise<GatewayProviderReadiness> {
+    return this.request<GatewayProviderReadiness>("/v1/connections/readiness", {
+      auth: "operator",
+    });
+  }
+
+  async startConnection(input: StartConnectionInput): Promise<GatewayConnectionResponse> {
+    return this.request<GatewayConnectionResponse>(
+      `/v1/connections/${encodeURIComponent(input.platform)}`,
+      {
+        auth: "operator",
+        method: "POST",
+        body: {
+          profile_id: input.profileId,
+          redirect_url: input.redirectUrl,
+        },
+      },
+    );
   }
 
   async listAccounts(): Promise<GatewayAccountList> {
