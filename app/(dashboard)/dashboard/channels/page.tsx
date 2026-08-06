@@ -1,4 +1,5 @@
 import { getSocialGatewayClient } from "@/lib/social-gateway/server";
+import type { Platform } from "@/lib/types/database";
 import { getWorkspace } from "@/lib/workspace";
 import { ChannelsView } from "./channels-view";
 
@@ -11,26 +12,26 @@ export default async function ChannelsPage() {
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false });
 
-  let providerOnboardingEnabled = false;
+  let onboardingPlatforms: Platform[] = [];
   try {
     const gateway = getSocialGatewayClient();
     const readiness = gateway ? await gateway.getProviderReadiness("meta") : null;
-    providerOnboardingEnabled = Boolean(
-      readiness?.configured &&
-        readiness.platforms.some(
-          (platform) => platform === "facebook" || platform === "instagram",
-        ),
-    );
+    onboardingPlatforms = readiness?.configured
+      ? readiness.platforms.filter(
+          (platform): platform is Platform =>
+            platform === "facebook" || platform === "instagram",
+        )
+      : [];
   } catch {
     // The Channels page remains available when the external Gateway is unavailable.
-    providerOnboardingEnabled = false;
+    onboardingPlatforms = [];
   }
 
   return (
     <ChannelsView
       channels={channels ?? []}
       workspaceId={workspace.id}
-      providerOnboardingEnabled={providerOnboardingEnabled}
+      onboardingPlatforms={onboardingPlatforms}
     />
   );
 }
