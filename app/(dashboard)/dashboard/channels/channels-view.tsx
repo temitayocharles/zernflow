@@ -69,12 +69,16 @@ function getDmLink(platform: Platform, username: string | null): { url: string |
 
 export function ChannelsView({
   channels: initialChannels,
-  providerOnboardingEnabled,
+  onboardingPlatforms,
 }: {
   channels: Channel[];
   workspaceId: string;
-  providerOnboardingEnabled: boolean;
+  onboardingPlatforms: Platform[];
 }) {
+  const availableConnectablePlatforms = connectablePlatforms.filter((platform) =>
+    onboardingPlatforms.includes(platform.id),
+  );
+  const providerOnboardingEnabled = availableConnectablePlatforms.length > 0;
   const [channels, setChannels] = useState(initialChannels);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -253,7 +257,7 @@ export function ChannelsView({
               </button>
               {showPlatformPicker && providerOnboardingEnabled && (
                 <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-lg">
-                  {connectablePlatforms.map((p) => (
+                  {availableConnectablePlatforms.map((p) => (
                     <button
                       key={p.id}
                       onClick={() => handleConnect(p.id)}
