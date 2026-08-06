@@ -13,16 +13,20 @@ export default function ChannelCallbackPage() {
   useEffect(() => {
     async function syncAndRedirect() {
       const connected = searchParams.get("connected");
-      const error = searchParams.get("error");
+      const errorCode = searchParams.get("error");
 
-      if (!connected) {
+      if (errorCode || !connected) {
+        const messages: Record<string, string> = {
+          access_denied: "Meta authorization was cancelled.",
+          meta_account_not_found: "The linked Facebook or Instagram account was not found.",
+          meta_account_selection_required:
+            "More than one matching Meta account was found. An administrator must select the intended account.",
+          meta_oauth_not_configured: "Meta onboarding is not fully configured yet.",
+          meta_subscription_failed: "Meta connected, but webhook subscription failed.",
+        };
         setStatus("error");
         setMessage(
-          error === "meta_oauth_asset_selection_required"
-            ? "More than one compatible Meta account was found. Account selection is required."
-            : error === "meta_authorization_denied"
-              ? "Meta authorization was cancelled."
-              : "Connection was cancelled or could not be completed.",
+          (errorCode && messages[errorCode]) || "Connection was cancelled or failed.",
         );
         setTimeout(() => router.push("/dashboard/channels"), 2000);
         return;

@@ -1,89 +1,85 @@
 import { NextResponse } from "next/server";
-import {
-  SocialGatewayConfigurationError,
-  SocialGatewayError,
-} from "@/lib/social-gateway/client";
+import { SocialGatewayError } from "@/lib/social-gateway/client";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
-import type { GatewayAccountPlatform } from "@/lib/social-gateway/types";
 import { getWorkspace } from "@/lib/workspace";
 
-const metaPlatforms = new Set<GatewayAccountPlatform>(["facebook", "instagram"]);
+type ConnectablePlatform = "facebook" | "instagram";
 
-function gatewayFailure(error: unknown): NextResponse {
-  if (error instanceof SocialGatewayConfigurationError) {
-    return NextResponse.json({ code: error.code, error: error.message }, { status: 503 });
-  }
-  if (error instanceof SocialGatewayError) {
-    return NextResponse.json(
-      { code: error.code, error: error.message, retryable: error.retryable },
-      { status: error.retryable ? 503 : 502 },
-    );
-  }
-  console.error("[channels/connect] unexpected failure", {
-    errorType: error instanceof Error ? error.name : typeof error,
-  });
-  return NextResponse.json(
-    { code: "channel_connection_failed", error: "Channel connection could not be started" },
-    { status: 500 },
-  );
+function isConnectablePlatform(value: unknown): value is ConnectablePlatform {
+  return value === "facebook" || value === "instagram";
 }
 
-function applicationBaseUrl(request: Request): URL {
+function callbackUrl(request: Request): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
   const base = new URL(configured || request.url);
-  if (
-    process.env.NODE_ENV === "production" &&
-    base.protocol !== "https:" &&
-    !new Set(["localhost", "127.0.0.1", "::1"]).has(base.hostname)
-  ) {
-    throw new SocialGatewayConfigurationError(
-      "NEXT_PUBLIC_APP_URL must use HTTPS in production",
-    );
+  if (process.env.NODE_ENV === "production" && base.protocol !== "https:") {
+    throw new Error("Production channel callbacks must use HTTPS");
   }
-  return base;
+  base.pathname = "/dashboard/channels/callback";
+  base.search = "";
+  base.hash = "";
+  return base.toString();
 }
 
 export async function POST(request: Request) {
-  const { workspace, role } = await getWorkspace();
+  const { role, workspace } = await getWorkspace();
   if (role !== "owner") {
     return NextResponse.json(
       { code: "workspace_owner_required", error: "Workspace owner access required" },
       { status: 403 },
     );
   }
-  let platform: GatewayAccountPlatform;
+
+  let body: unknown;
   try {
-    const body = (await request.json()) as { platform?: unknown };
-    if (typeof body.platform !== "string") throw new Error("missing platform");
-    platform = body.platform as GatewayAccountPlatform;
+    body = await request.json();
   } catch {
     return NextResponse.json(
-      { code: "invalid_channel_connection", error: "A channel platform is required" },
+      { code: "invalid_request", error: "A valid JSON request body is required" },
       { status: 400 },
     );
   }
-  if (!metaPlatforms.has(platform)) {
+  const platform =
+    typeof body === "object" && body !== null && "platform" in body
+      ? (body as { platform?: unknown }).platform
+      : undefined;
+  if (!isConnectablePlatform(platform)) {
     return NextResponse.json(
-      {
-        code: "provider_onboarding_not_supported",
-        error: "Self-service onboarding is currently available only for Facebook and Instagram",
-      },
+      { code: "unsupported_platform", error: "Only Facebook and Instagram are supported" },
       { status: 422 },
     );
   }
+
   try {
     const gateway = requireSocialGatewayClient();
-    const redirectUrl = new URL(
-      "/dashboard/channels/callback",
-      applicationBaseUrl(request),
-    ).toString();
-    const connection = await gateway.startConnection({
-      platform,
+    const readiness = await gateway.getProviderReadiness("meta");
+    if (!readiness.configured || !readiness.platforms.includes(platform)) {
+      return NextResponse.json(
+        {
+          code: "provider_onboarding_not_configured",
+          error: "Meta onboarding is not configured for this deployment yet.",
+        },
+        { status: 503 },
+      );
+    }
+    const connection = await gateway.startConnection(platform, {
       profileId: workspace.id,
-      redirectUrl,
+      redirectUrl: callbackUrl(request),
     });
-    return NextResponse.json(connection, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(connection, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
-    return gatewayFailure(error);
+    if (error instanceof SocialGatewayError) {
+      const status = error.status && error.status >= 400 ? error.status : 503;
+      return NextResponse.json(
+        { code: error.code, error: error.message },
+        { status, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    return NextResponse.json(
+      { code: "provider_connection_failed", error: "Unable to start the Meta connection" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

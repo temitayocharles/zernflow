@@ -46,23 +46,22 @@ export interface GatewayAccountList {
   accounts: GatewayAccount[];
 }
 
+export interface GatewayProviderReadiness {
+  provider: string;
+  configured: boolean;
+  application: string | null;
+  platforms: GatewayAccountPlatform[];
+}
+
+export interface GatewayConnectionInput {
+  profileId: string;
+  redirectUrl: string;
+}
+
 export interface GatewayConnectionResponse {
   authUrl: string;
   session_id: string;
   expires_at: string;
-}
-
-export interface GatewayProviderReadiness {
-  provider: "meta";
-  configured: boolean;
-  platforms: GatewayAccountPlatform[];
-  reason: string | null;
-}
-
-export interface StartConnectionInput {
-  platform: GatewayAccountPlatform;
-  profileId: string;
-  redirectUrl: string;
 }
 
 export interface GatewayAttachment {
@@ -248,8 +247,11 @@ export interface AssignmentInput {
 }
 
 export interface SocialGatewayClient {
-  getProviderReadiness(): Promise<GatewayProviderReadiness>;
-  startConnection(input: StartConnectionInput): Promise<GatewayConnectionResponse>;
+  getProviderReadiness(provider: "meta"): Promise<GatewayProviderReadiness>;
+  startConnection(
+    platform: "facebook" | "instagram",
+    input: GatewayConnectionInput,
+  ): Promise<GatewayConnectionResponse>;
   listAccounts(): Promise<GatewayAccountList>;
   listConversations(input?: ListConversationsInput): Promise<GatewayConversationPage>;
   getConversation(

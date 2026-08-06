@@ -4,20 +4,20 @@ import type {
   DraftReplyInput,
   GatewayAccountList,
   GatewayActionRequest,
+  GatewayConnectionInput,
+  GatewayConnectionResponse,
   GatewayConversationControl,
   GatewayConversationDetail,
   GatewayConversationPage,
   GatewayOperation,
   GatewayProviderReadiness,
-  GatewayConnectionResponse,
   GetConversationInput,
   ListConversationsInput,
   ReplyInput,
   SocialGatewayClient,
-  StartConnectionInput,
 } from "./types";
 
-type GatewayAuth = "operator" | "admin" | "agent";
+type GatewayAuth = "operator" | "admin" | "agent" | "none";
 type FetchLike = typeof fetch;
 
 export interface HttpSocialGatewayClientOptions {
@@ -160,15 +160,19 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
     }
   }
 
-  async getProviderReadiness(): Promise<GatewayProviderReadiness> {
-    return this.request<GatewayProviderReadiness>("/v1/connections/readiness", {
-      auth: "operator",
-    });
+  async getProviderReadiness(provider: "meta"): Promise<GatewayProviderReadiness> {
+    return this.request<GatewayProviderReadiness>(
+      `/v1/provider-readiness/${encodeURIComponent(provider)}`,
+      { auth: "none" },
+    );
   }
 
-  async startConnection(input: StartConnectionInput): Promise<GatewayConnectionResponse> {
+  async startConnection(
+    platform: "facebook" | "instagram",
+    input: GatewayConnectionInput,
+  ): Promise<GatewayConnectionResponse> {
     return this.request<GatewayConnectionResponse>(
-      `/v1/connections/${encodeURIComponent(input.platform)}`,
+      `/v1/connections/${encodeURIComponent(platform)}`,
       {
         auth: "operator",
         method: "POST",
@@ -398,6 +402,9 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
       headers.set("Content-Type", "application/json");
     }
 
+    if (auth === "none") {
+      return headers;
+    }
     if (auth === "operator") {
       headers.set("X-API-Key", this.operatorApiKey);
       headers.set("X-Actor-Ref", this.actorRef);
