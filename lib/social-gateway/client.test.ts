@@ -187,3 +187,62 @@ describe("HttpSocialGatewayClient", () => {
     ).toThrow(SocialGatewayConfigurationError);
   });
 });
+
+describe("HttpSocialGatewayClient Meta onboarding", () => {
+  it("reads public provider readiness without sending credentials", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        provider: "meta",
+        configured: true,
+        application: "Temitayo Charlie Tech",
+        platforms: ["facebook", "instagram"],
+      }),
+    );
+    const client = new HttpSocialGatewayClient({
+      baseUrl: "https://gateway.example.test",
+      operatorApiKey: OPERATOR_KEY,
+      fetchImpl: fetchMock as typeof fetch,
+      production: true,
+    });
+
+    const readiness = await client.getProviderReadiness("meta");
+
+    expect(readiness.configured).toBe(true);
+    const [input, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
+    expect(input.pathname).toBe("/v1/provider-readiness/meta");
+    const headers = new Headers(init.headers);
+    expect(headers.has("X-API-Key")).toBe(false);
+    expect(headers.has("Authorization")).toBe(false);
+  });
+
+  it("starts a Meta connection through the operator boundary", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        authUrl: "https://gateway.example.test/v1/connections/sessions/session-1/authorize?state=opaque",
+        session_id: "session-1",
+        expires_at: "2026-08-06T09:00:00Z",
+      }),
+    );
+    const client = new HttpSocialGatewayClient({
+      baseUrl: "https://gateway.example.test",
+      operatorApiKey: OPERATOR_KEY,
+      workspaceRef: "workspace-1",
+      fetchImpl: fetchMock as typeof fetch,
+      production: true,
+    });
+
+    await client.startConnection("instagram", {
+      profileId: "workspace-1",
+      redirectUrl: "https://app.zernflow.com/dashboard/channels/callback",
+    });
+
+    const [input, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
+    expect(input.pathname).toBe("/v1/connections/instagram");
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-API-Key")).toBe(OPERATOR_KEY);
+    expect(JSON.parse(String(init.body))).toEqual({
+      profile_id: "workspace-1",
+      redirect_url: "https://app.zernflow.com/dashboard/channels/callback",
+    });
+  });
+});

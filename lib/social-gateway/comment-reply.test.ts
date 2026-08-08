@@ -41,6 +41,8 @@ function operation(
 
 function gatewayReturning(result: GatewayOperation): SocialGatewayClient {
   return {
+    getProviderReadiness: vi.fn(),
+    startConnection: vi.fn(),
     listAccounts: vi.fn(),
     listConversations: vi.fn(),
     getConversation: vi.fn(),

@@ -1,87 +1,85 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createZernioClient } from "@/lib/zernio-client";
+import { NextResponse } from "next/server";
+import { SocialGatewayError } from "@/lib/social-gateway/client";
+import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
+import { getWorkspace } from "@/lib/workspace";
 
-async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+type ConnectablePlatform = "facebook" | "instagram";
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, workspaces(*)")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
-
-  if (!membership?.workspaces) return null;
-  return membership.workspaces;
+function isConnectablePlatform(value: unknown): value is ConnectablePlatform {
+  return value === "facebook" || value === "instagram";
 }
 
-/**
- * POST /api/v1/channels/connect
- *
- * Returns Zernio's OAuth/connect URL for the given platform.
- * Zernio handles the entire connection flow (OAuth, page selection, etc.)
- * and redirects back to our callback URL when done.
- */
-export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const workspace = await getWorkspace(supabase);
-  if (!workspace)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+function callbackUrl(request: Request): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const base = new URL(configured || request.url);
+  if (process.env.NODE_ENV === "production" && base.protocol !== "https:") {
+    throw new Error("Production channel callbacks must use HTTPS");
+  }
+  base.pathname = "/dashboard/channels/callback";
+  base.search = "";
+  base.hash = "";
+  return base.toString();
+}
 
-  if (!workspace.late_api_key_encrypted) {
+export async function POST(request: Request) {
+  const { role, workspace } = await getWorkspace();
+  if (role !== "owner") {
     return NextResponse.json(
-      { error: "Zernio API key not configured. Go to Settings first." },
-      { status: 400 }
+      { code: "workspace_owner_required", error: "Workspace owner access required" },
+      { status: 403 },
     );
   }
 
-  const { platform } = await request.json();
-
-  const supported = ["facebook", "instagram", "twitter", "telegram", "bluesky", "reddit"];
-  if (!platform || !supported.includes(platform)) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
     return NextResponse.json(
-      { error: `Unsupported platform. Must be one of: ${supported.join(", ")}` },
-      { status: 400 }
+      { code: "invalid_request", error: "A valid JSON request body is required" },
+      { status: 400 },
     );
   }
-
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  const platform =
+    typeof body === "object" && body !== null && "platform" in body
+      ? (body as { platform?: unknown }).platform
+      : undefined;
+  if (!isConnectablePlatform(platform)) {
+    return NextResponse.json(
+      { code: "unsupported_platform", error: "Only Facebook and Instagram are supported" },
+      { status: 422 },
+    );
+  }
 
   try {
-    // Get profile ID (required by Zernio's connect endpoint)
-    const profilesRes = await zernio.profiles.listProfiles();
-    const profiles = profilesRes.data?.profiles ?? [];
-    if (profiles.length === 0) {
+    const gateway = requireSocialGatewayClient();
+    const readiness = await gateway.getProviderReadiness("meta");
+    if (!readiness.configured || !readiness.platforms.includes(platform)) {
       return NextResponse.json(
-        { error: "No Zernio profiles found. Create one in your Zernio dashboard first." },
-        { status: 400 }
+        {
+          code: "provider_onboarding_not_configured",
+          error: "Meta onboarding is not configured for this deployment yet.",
+        },
+        { status: 503 },
       );
     }
-
-    const profileId = profiles[0]._id!;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const callbackUrl = `${appUrl}/dashboard/channels/callback`;
-
-    // Zernio handles everything: OAuth, page selection, Bluesky credentials, Telegram code
-    const res = await zernio.connect.getConnectUrl({
-      path: { platform },
-      query: { profileId, redirect_url: callbackUrl },
+    const connection = await gateway.startConnection(platform, {
+      profileId: workspace.id,
+      redirectUrl: callbackUrl(request),
     });
-
-    if (!res.data?.authUrl) {
-      return NextResponse.json({ error: "Failed to get connect URL" }, { status: 500 });
-    }
-
-    return NextResponse.json({ authUrl: res.data.authUrl });
+    return NextResponse.json(connection, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
-    console.error("Failed to get connect URL:", error);
+    if (error instanceof SocialGatewayError) {
+      const status = error.status && error.status >= 400 ? error.status : 503;
+      return NextResponse.json(
+        { code: error.code, error: error.message },
+        { status, headers: { "Cache-Control": "no-store" } },
+      );
+    }
     return NextResponse.json(
-      { error: `Connection failed: ${error instanceof Error ? error.message : String(error)}` },
-      { status: 500 }
+      { code: "provider_connection_failed", error: "Unable to start the Meta connection" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 }
