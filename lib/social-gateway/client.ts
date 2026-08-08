@@ -4,17 +4,20 @@ import type {
   DraftReplyInput,
   GatewayAccountList,
   GatewayActionRequest,
+  GatewayConnectionInput,
+  GatewayConnectionResponse,
   GatewayConversationControl,
   GatewayConversationDetail,
   GatewayConversationPage,
   GatewayOperation,
+  GatewayProviderReadiness,
   GetConversationInput,
   ListConversationsInput,
   ReplyInput,
   SocialGatewayClient,
 } from "./types";
 
-type GatewayAuth = "operator" | "admin" | "agent";
+type GatewayAuth = "operator" | "admin" | "agent" | "none";
 type FetchLike = typeof fetch;
 
 export interface HttpSocialGatewayClientOptions {
@@ -155,6 +158,30 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
     if (this.agentCredential) {
       normalizeCredential(this.agentCredential, "agentCredential");
     }
+  }
+
+  async getProviderReadiness(provider: "meta"): Promise<GatewayProviderReadiness> {
+    return this.request<GatewayProviderReadiness>(
+      `/v1/provider-readiness/${encodeURIComponent(provider)}`,
+      { auth: "none" },
+    );
+  }
+
+  async startConnection(
+    platform: "facebook" | "instagram",
+    input: GatewayConnectionInput,
+  ): Promise<GatewayConnectionResponse> {
+    return this.request<GatewayConnectionResponse>(
+      `/v1/connections/${encodeURIComponent(platform)}`,
+      {
+        auth: "operator",
+        method: "POST",
+        body: {
+          profile_id: input.profileId,
+          redirect_url: input.redirectUrl,
+        },
+      },
+    );
   }
 
   async listAccounts(): Promise<GatewayAccountList> {
@@ -375,6 +402,9 @@ export class HttpSocialGatewayClient implements SocialGatewayClient {
       headers.set("Content-Type", "application/json");
     }
 
+    if (auth === "none") {
+      return headers;
+    }
     if (auth === "operator") {
       headers.set("X-API-Key", this.operatorApiKey);
       headers.set("X-Actor-Ref", this.actorRef);
