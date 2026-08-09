@@ -3,6 +3,9 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
+const appUrl = (
+  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+).replace(/\/$/, "");
 
 export const metadata: Metadata = {
   title: {
@@ -11,12 +14,12 @@ export const metadata: Metadata = {
   },
   description:
     "Automate DMs, comments, and flows across Instagram, Facebook, Telegram, X, Bluesky, and Reddit. Free, self-hostable, and open source.",
-  metadataBase: new URL("https://zernflow.com"),
+  metadataBase: new URL(appUrl),
   openGraph: {
     title: "ZernFlow - The Open Source ManyChat Alternative",
     description:
       "Automate DMs, comments, and flows across Instagram, Facebook, Telegram, X, Bluesky, and Reddit. Free, self-hostable, and open source.",
-    url: "https://zernflow.com",
+    url: appUrl,
     siteName: "ZernFlow",
     type: "website",
   },
