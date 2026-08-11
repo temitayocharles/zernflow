@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, isGitHubAuthEnabled } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -15,7 +15,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
-  const githubAuthEnabled = process.env.NEXT_PUBLIC_GITHUB_AUTH_ENABLED === "true";
+  const githubAuthEnabled = isGitHubAuthEnabled();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
