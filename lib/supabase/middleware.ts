@@ -1,12 +1,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function getRuntimeSupabaseConfig() {
+  const runtimeEnv = process.env as Record<string, string | undefined>;
+  const supabaseUrl = runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"];
+  const supabaseAnonKey = runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("ZernFlow Supabase runtime configuration is unavailable.");
+  }
+
+  return { supabaseUrl, supabaseAnonKey };
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const { supabaseUrl, supabaseAnonKey } = getRuntimeSupabaseConfig();
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {

@@ -2,12 +2,26 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/types/database";
 
+function getRuntimeSupabaseConfig() {
+  const runtimeEnv = process.env as Record<string, string | undefined>;
+  const supabaseUrl = runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"];
+  const supabaseAnonKey = runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+  const serviceRoleKey = runtimeEnv["SUPABASE_SERVICE_ROLE_KEY"];
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("ZernFlow Supabase runtime configuration is unavailable.");
+  }
+
+  return { supabaseUrl, supabaseAnonKey, serviceRoleKey };
+}
+
 export async function createClient() {
   const cookieStore = await cookies();
+  const { supabaseUrl, supabaseAnonKey } = getRuntimeSupabaseConfig();
 
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -28,9 +42,15 @@ export async function createClient() {
 }
 
 export async function createServiceClient() {
+  const { supabaseUrl, serviceRoleKey } = getRuntimeSupabaseConfig();
+
+  if (!serviceRoleKey) {
+    throw new Error("ZernFlow Supabase service role configuration is unavailable.");
+  }
+
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    supabaseUrl,
+    serviceRoleKey,
     {
       cookies: {
         getAll() {
