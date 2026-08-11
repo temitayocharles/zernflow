@@ -3,8 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 function getRuntimeSupabaseConfig() {
   const runtimeEnv = process.env as Record<string, string | undefined>;
-  const supabaseUrl = runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"];
-  const supabaseAnonKey = runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+  const supabaseUrl =
+    runtimeEnv["SUPABASE_URL"] ?? runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"];
+  const supabaseAnonKey =
+    runtimeEnv["SUPABASE_ANON_KEY"] ??
+    runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("ZernFlow Supabase runtime configuration is unavailable.");
@@ -43,35 +46,25 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-
-  const isAuthPage = pathname === "/login" || pathname === "/register";
   const isAuthCallback = pathname === "/auth/callback";
   const isDashboard = pathname.startsWith("/dashboard");
   const isApiRoute = pathname.startsWith("/api/");
 
-  // Auth callback and API routes (including webhooks) always pass through
+  // Auth callback and API routes (including webhooks) always pass through.
   if (isAuthCallback || isApiRoute) {
     return supabaseResponse;
   }
 
-  // Redirect logged-in users away from auth pages to dashboard
-  if (user && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    const redirectResponse = NextResponse.redirect(url);
-    // Forward any refreshed session cookies
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value);
-    });
-    return redirectResponse;
-  }
+  // Keep /login and /register reachable even when a session cookie exists.
+  // Successful auth flows navigate to /dashboard themselves. This makes the
+  // auth pages a safe recovery path and prevents a user-without-workspace
+  // state from bouncing /dashboard -> /login -> /dashboard indefinitely.
 
-  // Redirect unauthenticated users trying to access dashboard to login
+  // Redirect unauthenticated dashboard requests to login.
   if (!user && isDashboard) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     const redirectResponse = NextResponse.redirect(url);
-    // Forward any refreshed session cookies
     supabaseResponse.cookies.getAll().forEach((cookie) => {
       redirectResponse.cookies.set(cookie.name, cookie.value);
     });

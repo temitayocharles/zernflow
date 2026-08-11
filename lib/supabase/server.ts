@@ -4,8 +4,11 @@ import type { Database } from "@/lib/types/database";
 
 function getRuntimeSupabaseConfig() {
   const runtimeEnv = process.env as Record<string, string | undefined>;
-  const supabaseUrl = runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"];
-  const supabaseAnonKey = runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+  const supabaseUrl =
+    runtimeEnv["SUPABASE_URL"] ?? runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"];
+  const supabaseAnonKey =
+    runtimeEnv["SUPABASE_ANON_KEY"] ??
+    runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
   const serviceRoleKey = runtimeEnv["SUPABASE_SERVICE_ROLE_KEY"];
 
   if (!supabaseUrl || !supabaseAnonKey) {

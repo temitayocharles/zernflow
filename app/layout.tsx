@@ -45,14 +45,26 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Ensure public browser configuration is read from the deployment's runtime
-  // environment rather than frozen into the image during `next build`.
+  // Force request-time rendering so self-hosted runtime configuration is read
+  // from the deployment environment instead of being frozen into the image.
   await connection();
 
   const runtimeEnv = process.env as Record<string, string | undefined>;
+  // NEXT_PUBLIC_* values are build-time inputs in Next.js. Prefer server-only
+  // aliases for self-hosted runtime injection, while keeping the public names
+  // as a compatibility fallback for local and legacy deployments.
+  const supabaseUrl =
+    runtimeEnv["SUPABASE_URL"] ??
+    runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"] ??
+    "";
+  const supabaseAnonKey =
+    runtimeEnv["SUPABASE_ANON_KEY"] ??
+    runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"] ??
+    "";
+
   const runtimeConfig = JSON.stringify({
-    supabaseUrl: runtimeEnv["NEXT_PUBLIC_SUPABASE_URL"] ?? "",
-    supabaseAnonKey: runtimeEnv["NEXT_PUBLIC_SUPABASE_ANON_KEY"] ?? "",
+    supabaseUrl,
+    supabaseAnonKey,
     githubAuthEnabled:
       runtimeEnv["NEXT_PUBLIC_GITHUB_AUTH_ENABLED"] === "true",
   }).replace(/</g, "\\u003c");
