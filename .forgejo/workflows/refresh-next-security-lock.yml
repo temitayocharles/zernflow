@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   refresh:
-    runs-on: ["forgejo-general"]
+    runs-on: ["forgejo-container"]
     container:
       image: node:24-bookworm
     env:
