@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   diagnose:
-    runs-on: ["forgejo-container"]
+    runs-on: ["forgejo-general"]
     container:
       image: node:24-bookworm
     env:
