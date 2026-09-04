@@ -51,6 +51,7 @@ jobs:
           set -eu
           echo "Reproducing CI stage: ${DIAG_STAGE}"
           case "${DIAG_STAGE}" in
+            install) true ;;
             audit) npm audit --omit=dev --audit-level=high ;;
             lint) npm run lint ;;
             typecheck) npm run typecheck ;;
