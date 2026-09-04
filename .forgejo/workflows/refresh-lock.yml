@@ -1,0 +1,47 @@
+name: Refresh dependency lockfile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ["forgejo-container"]
+    container:
+      image: node:24-bookworm
+    env:
+      TARGET_BRANCH: fix/next-16.3.4-audit
+    steps:
+      - name: Fetch exact repair branch
+        shell: sh
+        run: |
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends git
+          git config --global --add safe.directory "$PWD"
+          git init .
+          git remote add origin "${FORGEJO_SERVER_URL:-${GITHUB_SERVER_URL}}/${FORGEJO_REPOSITORY:-${GITHUB_REPOSITORY}}.git"
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "${token}"
+          git -c http.extraHeader="Authorization: token ${token}" fetch --depth=1 origin "refs/heads/${TARGET_BRANCH}"
+          git checkout -B "${TARGET_BRANCH}" FETCH_HEAD
+
+      - name: Regenerate lockfile from package manifest
+        shell: sh
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Commit lockfile and self-remove
+        shell: sh
+        run: |
+          set -eu
+          rm -f .forgejo/workflows/refresh-lock.yml
+          git config user.name "forgejo-actions"
+          git config user.email "forgejo-actions@users.noreply.forgejo.tca-infraforge.site"
+          git add package-lock.json .forgejo/workflows/refresh-lock.yml
+          git diff --cached --check
+          git commit -m "fix(deps): refresh lockfile for patched dependency set"
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "${token}"
+          git -c http.extraHeader="Authorization: token ${token}" push origin "HEAD:refs/heads/${TARGET_BRANCH}"
