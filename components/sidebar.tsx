@@ -42,6 +42,7 @@ const navigation = [
   { name: "Flows", href: "/dashboard/flows", icon: GitBranch },
   { name: "Inbox", href: "/dashboard/inbox", icon: MessageSquare },
   { name: "Contacts", href: "/dashboard/contacts", icon: Users },
+  { name: "CRM", href: "/dashboard/crm/companies", icon: Users },
   { name: "Broadcasts", href: "/dashboard/broadcasts", icon: Radio },
   { name: "Sequences", href: "/dashboard/sequences", icon: ListOrdered },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },

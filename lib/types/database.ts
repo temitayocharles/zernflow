@@ -1,3 +1,4 @@
+import type { ProductTables } from "@/lib/product/types";
 export type Json =
   | string
   | number
@@ -75,7 +76,7 @@ export interface SequenceStep {
 
 export interface Database {
   public: {
-    Tables: {
+    Tables: ProductTables & {
       workspaces: {
         Row: {
           id: string;

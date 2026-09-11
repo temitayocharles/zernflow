@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Verify canonical Gateway work-item and collaboration ownership/contracts (GitHub API currently returns 404). Then implement tenant-isolated reusable work-item schema/API and connect `lib/service-desk/sla.ts`; do not invent a parallel ticket ledger. Independently add browser integration tests for inbox selection races, optimistic sends, and pagination scroll anchoring.
+Add migration 00022 for reusable work items and queues with tenant-consistent CRM/conversation references, immutable reference numbering and status/activity guards. Wire existing SLA calculations to persisted policy snapshots and build work-item API/list/detail/Kanban views.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -78,3 +78,11 @@ Verify canonical Gateway work-item and collaboration ownership/contracts (GitHub
 - No migration added, no production/runtime smoke executed, no provider certification claimed.
 - Remaining unimplemented roadmap is not exhausted. This is a restart-safe partial engineering checkpoint, not program completion.
 - Potential existing security boundary requiring canonical verification: Gateway listAccounts uses a deployment-level operator credential; confirm its workspace scoping before multi-workspace live acceptance. Do not treat local RLS alone as proof of remote tenant isolation.
+
+## Continuation session — CRM persistence (2026-09-11)
+- Reconciled restored workspace snapshot with pushed `747a111` by preserving a safety stash, then fast-forwarding the existing Arena branch. No prior commits recreated.
+- CODE COMPLETE: migration 00021 adds tenant-isolated companies, customer profiles (company, owner, lifecycle, source, score), opportunities (stage, currency/minor-unit value, close/reopen state), immutable internal notes and database-attributed activity.
+- Composite foreign keys enforce workspace consistency even for direct PostgREST writes. Record identity is immutable; update versions and deal close timestamps are database-controlled. No client writes to audit and no destructive CRM delete API.
+- Added authenticated scoped CRM list/create/detail/update APIs, optimistic version checks, actual CRM list/detail/edit screens, relationship selectors, internal notes and activity UI.
+- LOCAL VALIDATION: 182 tests / 23 files pass, including PostgreSQL (PGlite) execution of actual migrations 00001/00002/00021 and seven RLS/constraint/audit tests; lint 44 baseline warnings, no errors. Build validation recorded at commit.
+- Migration application and authenticated live browser acceptance remain external. Gateway access does not block local product domain implementation.

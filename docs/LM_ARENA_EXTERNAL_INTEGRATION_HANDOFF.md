@@ -71,3 +71,27 @@ History, pending sends and workspace boundaries remain intact under paging and r
 Repeated cursors, missing history, cross-conversation messages, lost pending sends, or unread state cleared after failed reads.
 ### Rollback consideration
 Revert UI paging independently. Default API callers still receive the legacy array response; no database migration is involved.
+
+## ITEM: CRM migration and acceptance
+### Code status
+COMPLETE
+### Repository evidence
+Commit: CRM continuation slice on PR #11 (see git history).
+Files: `supabase/migrations/00021_crm_foundations.sql`, `lib/crm/`, `lib/product/`, `app/api/v1/crm/`, `app/(dashboard)/dashboard/crm/`
+Tests: `lib/product/database.test.ts`, `lib/crm/contracts.test.ts`.
+### External system
+Supabase / Northflank
+### Exact action required
+Apply forward migration 00021 after 00001–00020 on a disposable project, then promote after acceptance. Verify the API and CRM screens under two separate workspace accounts.
+### Environment variables / secret names
+Existing Supabase variables; no new secrets.
+### Endpoint or callback expected
+`/dashboard/crm/companies`, `/dashboard/crm/deals`, `/dashboard/crm/customer_profiles`, `/api/v1/crm/*`
+### Verification procedure
+Create company/profile/deal, link contact, add note, update deal to won and reopen. Confirm cross-workspace foreign keys fail, nonmembers cannot read, concurrent stale versions return conflict, and audit actor cannot be supplied by the browser.
+### Expected success result
+Durable customer entities, immutable notes/audit attribution, safe relationships, and visible error states.
+### Failure symptoms
+Missing tables (migration not applied), foreign records visible, silent conflicts, or forged audit attribution.
+### Rollback consideration
+Roll back application independently and retain customer data. Do not drop new tables in production as an automatic rollback.
