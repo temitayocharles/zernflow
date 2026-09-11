@@ -4,7 +4,7 @@
 - Base branch: `main`
 - Current remote main HEAD: `88d647bef3754c4af102bbd8739b57aca3053eab`; continuation includes pushed CRM/work/collaboration/integration/analytics slices (see branch history).
 - Active PR: https://github.com/temitayocharles/zernflow/pull/11
-- Last successful validation: Node 24/npm 11 production build, typecheck, 241 tests / 35 files; full SQL history 00001–00026 executed in PostgreSQL fixture; lint 44 baseline warnings.
+- Last successful validation: clean npm install on Node 24.21.0/npm 11.19.1; lint (44 warnings, no errors), typecheck, 280 tests / 43 files, production build and zero-vulnerability production audit; complete SQL history 00001–00029 executed.
 - Last updated: 2026-09-11
 ## Completed
 - [x] Fetched remote heads; no prior completion branch or ledger exists.
@@ -15,15 +15,15 @@
 - [x] CODE COMPLETE / LOCAL VALIDATION COMPLETE: connector registry, fail-closed OAuth/capability resolution, Gateway-managed Telegram setup guidance, owner-only channel UI controls. No new Gateway endpoints assumed.
 ## Next
 - [ ] Verify Gateway canonical docs and deployed contracts before expanding integration APIs.
-- [ ] Audit collaboration and inbox gaps, then implement missing tenant-scoped product entities in dependency order.
-- [ ] Implement CRM, work items/SLA, email, publishing, analytics, knowledge and notifications after checking authoritative ownership and existing backend support.
+- [x] Implemented collaboration control/UI seams, inbox notes/mentions/templates and tenant-scoped CRM/work entities; see continuation slices below.
+- [x] Implemented local CRM/work/SLA/editorial/knowledge/mailbox/notification foundations and operator analytics; provider execution contracts remain separate from local configuration.
 ## External Integration Required
 - [ ] Gateway canonical repository access: GitHub contents API for `temitayocharles/agent-social-gateway` returns HTTP 404; no canonical docs were retrieved.
 - [ ] Disposable Supabase and Gateway runtime for integration/smoke acceptance (no credentials supplied).
 ## Known Defects / Technical Debt
 - [x] Fixed baseline external-font build failure by bundling licensed Inter locally.
 - [x] Node 24/npm 11 validation available through `npm exec --package=node@24 --package=npm@11 -- npm ...`; default shell remains Node 22.
-- [ ] Baseline lint has 45 warnings. Production audit: 3 low vulnerabilities, zero high; full dependency audit additionally reports development vulnerabilities.
+- [ ] Current lint retains 44 existing warnings (baseline 45). Production audit is clean. Two moderate development-only Vitest/mocker findings require a separately validated major test-runner upgrade; no unsafe forced upgrade performed.
 - [x] Removed legacy smoke remote defaults; explicit write acknowledgement, origins/UUID validation and tenant/channel/account preflight now required. Legacy smoke is not Gateway certification.
 - [x] Corrected superseded README Postiz and branch setup language.
 ## Important Decisions
@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Run Node 24/npm 11 clean install, lint, typecheck, complete DOM/unit/PostgreSQL tests and production build against migrations 00001–00029; update PR #11 and rollout documentation. If any validation fails, fix that exact regression first. External adapters remain disabled until the handoff contracts are verified.
+Implement the concrete Gateway-backed EmailChannelAdapter in `lib/email/gateway-adapter.ts` once the external integration handoff supplies a verified workspace-scoped mailbox/thread/send contract; connect its inbound envelope projection and reply operation to the inbox without adding another message ledger. In parallel, wire authorized Gateway approval/policy projections into the already-tested ApprovalQueue/AutonomyPolicyPanel callbacks only after request ownership can be verified. Do not recreate completed CRM/work migrations or invent those endpoints.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -141,3 +141,14 @@ Run Node 24/npm 11 clean install, lint, typecheck, complete DOM/unit/PostgreSQL 
 - Migration 00029 fixes a privileged RPC grant boundary: Supabase default privileges can grant authenticated/anon EXECUTE independently of PUBLIC. Worker-only unread/counter, Gateway claim/projection and SLA scan functions now explicitly revoke those grants and retain service_role access. Legacy security-definer search paths hardened.
 - SQL test fixture now models explicit default client function grants and verifies worker-only RPC privileges. Additional tests verify cron auth/failure/no-job behavior, scheduled signal deduplication, knowledge source authorization and editorial variant approval invalidation/foreign references.
 - Local targeted SQL/route tests pass; complete validation is rerun after this slice.
+
+
+## Final validated continuation checkpoint (2026-09-11)
+- Pushed implementation through `0a41231` before final evidence update. `origin/main` remains `88d647b`; same PR #11 and branch retained throughout. Safety stash compared against original pushed `747a111`: all restored untracked files were identical, so no user work was lost or duplicated.
+- Fresh locked install, lint, typecheck, all **280 tests / 43 files**, Next.js production build and production dependency audit pass under **Node 24.21.0 / npm 11.19.1**.
+- Tests include complete SQL migration history **00001–00029**, Supabase-like default function grants, tenant/FK/audit/state/notification checks, API auth/validation/conflicts, and React DOM request-race/form/approval/policy interactions.
+- **CODE COMPLETE / LOCAL VALIDATION COMPLETE** applies to the repository-owned foundations implemented in this continuation. It does not mean every possible roadmap enhancement is implemented, deployed, or certified.
+- **RUNTIME INTEGRATION REQUIRED / LIVE ACCEPTANCE REQUIRED**: apply forward migrations, real authenticated browser acceptance, Gateway actor/workspace controls and provider acceptance, verified email/publishing/approval/policy adapter wiring, external RAG endpoint/source authorization, active Northflank jobs scheduler and production smoke. See handoff item procedures; no values or credentials were fabricated.
+- GitHub reports no checks for this branch; Forgejo CI and production deployment are not falsely reported green. No live write-bearing smoke was run without isolated credentials.
+- Deliberate product bounds are visible: 50-row paged lists, 200 initial contact/company reference options with existing selections preserved, 500-member directory, 100-item note/activity sections, 500 manual SLA review items, and 1000 newly due scheduled signals per cron invocation. Timed notifications now use the existing cron; earlier manual-only notes are superseded.
+- Scope boundaries remain explicit: calendar-time SLA snapshots (not business-hour calendars), no provider execution fabricated from mailbox/editorial configuration, no HTML email injection, no duplicate RAG/job/provider/message/event ledger.

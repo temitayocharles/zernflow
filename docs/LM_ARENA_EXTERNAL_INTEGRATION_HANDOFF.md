@@ -287,3 +287,21 @@ Timed notifications through the existing runner, safe retries, explicit degraded
 Missing RPC migration (503), worker permission denial, duplicate signals, stalled batches or browser RPC execution still granted.
 ### Rollback consideration
 Do not restore broad browser grants as rollback. Pause the scheduler/UI if necessary, retain records and fix service-role deployment configuration. Already-completed jobs must not be manually reset merely because a later SLA scan failed.
+
+
+## Current release validation summary
+
+The latest continuation passes clean install, lint, typecheck, **280 tests in 43
+files**, production build and production audit (zero vulnerabilities) under Node
+24.21.0/npm 11.19.1. Apply the full forward migration range through **00029**;
+individual earlier slice instructions are prerequisites, not the final required
+schema range. PostgreSQL fixtures execute every numbered migration and model
+Supabase's explicit default client function grants. DOM fixtures validate
+interaction state, not live browser/provider acceptance.
+
+Repository-owned CRM/work/editorial/configuration/notification/analytics code
+is implemented. Remaining concrete adapter code is blocked on verified external
+contracts, not on a request to invent provider behavior. Keep those runtime
+controls unavailable until the relevant item above is accepted. Maintain the
+same PR #11 for any integration corrections; do not restart from main or drop
+persisted customer/work data as rollback.

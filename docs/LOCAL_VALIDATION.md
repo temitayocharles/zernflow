@@ -33,3 +33,13 @@ also accepts process environment configuration without an environment file.
 Gateway live acceptance still requires signed real inbound events, account
 scoping verification, and durable outbound operation confirmation. It cannot
 be inferred from legacy smoke or mocked unit tests.
+
+
+## Product-domain tests
+
+`npm test` also executes all numbered SQL migrations in PGlite PostgreSQL with
+minimal Supabase Auth/publication/default-grant fixtures and runs React DOM
+interaction tests in jsdom. These exercise actual PostgreSQL constraints/RLS and
+component behavior locally; they do not certify live Supabase Auth, Realtime,
+Gateway credentials or browser rendering against production. Current product
+migrations extend through 00029. See the migration runbook before deployment.

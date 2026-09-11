@@ -20,6 +20,9 @@ engine foundation, **not a completed ticket product or escalation worker**.
 - `escalationRequired` is a calculation result only. The owning backend must
   enforce policy, deduplication and durable execution before sending alerts.
 
-Work-item schema/UI, immutable policy snapshots, authorized response/completion
-recording, business-hour calendars, notifications, and escalation dispatch are
-not implemented by this module. Do not infer them from passing unit tests.
+This pure module does not perform persistence or dispatch. The continuation now
+connects it to `work_items` snapshots and operator screens through
+`lib/service-desk/work-items.ts`, with guarded response/completion timestamps,
+manual notification review and the existing jobs cron (migrations 00022–00029).
+Business-hour calendars and provider-side escalation execution remain outside
+this module. Do not infer live acceptance from passing unit tests.
