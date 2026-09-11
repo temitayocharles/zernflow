@@ -143,3 +143,27 @@ Real Gateway control changes with correct operator identity, tenant-safe notes/m
 Remote actor rejected, cross-workspace controls accepted, forged audit, duplicate mentions, or local UI claiming an unconfirmed remote state.
 ### Rollback consideration
 Do not blindly retry a control after an audit-only failure. Revert UI independently, preserve Gateway control state and database records.
+
+## ITEM: Email, editorial and knowledge adapters
+### Code status
+PARTIAL
+### Repository evidence
+Commit: integration-seams slice on PR #11.
+Files: migration 00024, `lib/email/`, `lib/publishing/`, `lib/knowledge/`, `lib/connectors/browser-session.ts`, `docs/PRODUCT_INTEGRATION_SEAMS.md`.
+Tests: email, publishing, knowledge response/timeout boundary, browser session, configuration, and PostgreSQL approval/owner policy tests.
+### External system
+Supabase / Agent Social Gateway / external RAG / email connector / maintained publishing connector
+### Exact action required
+Apply 00024. For RAG, implement/verify the explicitly documented retrieval seam, configure its complete HTTPS endpoint and server-only token, map source refs per workspace, then accept citations and failures. For email/publishing, supply verified Gateway connector contracts to implement the existing replaceable adapters; configure credentials only in the owning external system. Do not treat mailbox rows or editorial approval as operational provider support.
+### Environment variables / secret names
+KNOWLEDGE_RETRIEVAL_URL, KNOWLEDGE_API_TOKEN; existing Gateway variables. No email or publishing secrets stored in ZernFlow tables.
+### Endpoint or callback expected
+Knowledge endpoint is the full configured URL, with request/response in `docs/PRODUCT_INTEGRATION_SEAMS.md`. Email/publishing Gateway paths deliberately unspecified until verified.
+### Verification procedure
+Retrieve from two tenants and reject foreign source refs/citations. Confirm response bounds and errors. Complete real email inbound/reply and per-channel publishing durable-operation acceptance after adapter wiring. Test editorial edits revoke approval. Browser sessions requiring MFA/challenges must remain human-controlled.
+### Expected success result
+Real source citations and provider operations with trustworthy state, source/tenant attribution, and no credential leakage.
+### Failure symptoms
+Foreign citations, fake connected/published states, HTML injection, speculative endpoint calls, or bypass of provider controls.
+### Rollback consideration
+Disable external adapter configuration and retain local drafts/source/mailbox records. Do not erase provider state or credentials during rollback.

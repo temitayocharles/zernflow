@@ -9,9 +9,11 @@ beforeAll(async()=>{
   await db.exec(`create publication supabase_realtime; create schema auth; create table auth.users(id uuid primary key); create role authenticated; create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; create function uuid_generate_v4() returns uuid language sql as $$ select gen_random_uuid() $$;`);
   await db.exec(readFileSync('supabase/migrations/00001_initial_schema.sql','utf8').replace('create extension if not exists "uuid-ossp";',''));
   await db.exec(readFileSync('supabase/migrations/00002_rls_policies.sql','utf8'));
+  await db.exec(readFileSync('supabase/migrations/00016_harden_configuration_rls.sql','utf8'));
   await db.exec(readFileSync('supabase/migrations/00021_crm_foundations.sql','utf8'));
   await db.exec(readFileSync('supabase/migrations/00022_work_items.sql','utf8'));
   await db.exec(readFileSync('supabase/migrations/00023_collaboration_notifications.sql','utf8'));
+  await db.exec(readFileSync('supabase/migrations/00024_editorial_knowledge_email.sql','utf8'));
   await db.exec(`insert into auth.users values('${user}'); insert into workspaces(id,name,slug) values('${ws}','A','a'),('${other}','B','b'); insert into workspace_members(workspace_id,user_id) values('${ws}','${user}'); grant usage on schema public,auth to authenticated; grant select,insert,update,delete on all tables in schema public to authenticated; select set_config('request.jwt.claim.sub','${user}',false); set role authenticated;`);
 },30000);
 afterAll(async()=>{await db.close();});
@@ -86,5 +88,24 @@ describe('Operator notifications and mentions',()=>{
   await expect(db.exec(`update operator_notifications set title='Forged' where id='${rows[0].id}'`)).rejects.toThrow();
   await db.exec(`update operator_notifications set read_at=now() where id='${rows[0].id}'`);
   await expect(db.exec(`insert into operator_notifications(workspace_id,recipient_id,title,kind,entity_type,entity_id,dedupe_key) values('${ws}','${user}','Fake','mention','companies','${company}','fake')`)).rejects.toThrow();
+ });
+});
+
+describe('Editorial and external source configuration',()=>{
+ it('invalidates editorial approval on content changes',async()=>{
+  const {rows}=await db.query<{id:string}>(`insert into editorial_drafts(workspace_id,name,body) values('${ws}','Editorial','Content') returning id`);const id=rows[0].id;
+  await expect(db.exec(`update editorial_drafts set state='approved' where id='${id}'`)).rejects.toThrow();
+  await db.exec(`update editorial_drafts set state='in_review' where id='${id}';update editorial_drafts set state='approved' where id='${id}'`);
+  expect((await db.query<{reviewed_by:string}>(`select reviewed_by from editorial_drafts where id='${id}'`)).rows[0].reviewed_by).toBe(user);
+  await db.exec(`update editorial_drafts set body='Revised' where id='${id}'`);
+  expect((await db.query<{state:string}>(`select state from editorial_drafts where id='${id}'`)).rows[0].state).toBe('draft');
+  await expect(db.exec(`update editorial_drafts set state='published' where id='${id}'`)).rejects.toThrow();
+ });
+ it('limits knowledge and mailbox configuration to owners',async()=>{
+  await db.exec(`reset role;update workspace_members set role='member' where workspace_id='${ws}' and user_id='${user}';set role authenticated;`);
+  await expect(db.exec(`insert into knowledge_sources(workspace_id,name,source_ref) values('${ws}','Knowledge','source')`)).rejects.toThrow();
+  await expect(db.exec(`insert into mailbox_identities(workspace_id,name,address) values('${ws}','Support','support@example.com')`)).rejects.toThrow();
+  await db.exec(`reset role;update workspace_members set role='owner' where workspace_id='${ws}' and user_id='${user}';set role authenticated;`);
+  await db.exec(`insert into knowledge_sources(workspace_id,name,source_ref) values('${ws}','Knowledge','source');insert into mailbox_identities(workspace_id,name,address) values('${ws}','Support','support@example.com')`);
  });
 });

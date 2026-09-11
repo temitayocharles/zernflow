@@ -10,7 +10,7 @@ export function RecordForm({fields,endpoint,record,options={},redirectBase}:{fie
   const form=new FormData(event.currentTarget);const body:Record<string,unknown>={};
   for(const field of fields){if(record && field.key==='contact_id' && endpoint.includes('customer_profiles'))continue;const raw=String(form.get(field.key)??'');
    if(!record && !raw && !field.required)continue;
-   body[field.key]=field.key.endsWith('_id')||field.type==='datetime-local' ? (raw ? field.type==='datetime-local'?new Date(`${raw}Z`).toISOString():raw : null) : field.type==='number'?Number(raw):raw;
+   body[field.key]=field.key==='enabled'?raw==='true':field.key.endsWith('_id')||field.type==='datetime-local' ? (raw ? field.type==='datetime-local'?new Date(`${raw}Z`).toISOString():raw : null) : field.type==='number'?Number(raw):raw;
   }
   if(record)body.version=record.version;
   try{const response=await fetch(endpoint+(record?`/${record.id}`:''),{method:record?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await response.json();if(!response.ok)throw new Error(data.error||'Save failed'); if(!record)router.push(['/api/v1/work-queues','/api/v1/canned-replies'].includes(endpoint)?redirectBase:`${redirectBase}/${data.id}`);router.refresh();}catch(e){setError(e instanceof Error?e.message:'Save failed');}finally{setSaving(false);}

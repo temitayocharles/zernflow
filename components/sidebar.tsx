@@ -42,6 +42,9 @@ const navigation = [
   { name: "Flows", href: "/dashboard/flows", icon: GitBranch },
   { name: "Inbox", href: "/dashboard/inbox", icon: MessageSquare },
   { name: "Contacts", href: "/dashboard/contacts", icon: Users },
+  { name: "Editorial", href: "/dashboard/configuration/editorial_drafts", icon: Radio },
+  { name: "Email identities", href: "/dashboard/configuration/mailbox_identities", icon: MessageSquare },
+  { name: "Knowledge", href: "/dashboard/knowledge", icon: ListOrdered },
   { name: "Notifications", href: "/dashboard/notifications", icon: MessageSquare },
   { name: "Canned replies", href: "/dashboard/canned-replies", icon: MessageSquare },
   { name: "Work items", href: "/dashboard/work-items", icon: ListOrdered },
@@ -89,7 +92,7 @@ export function Sidebar({
         <WorkspaceSwitcher current={workspace} workspaces={workspaces} />
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
         {navigation.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (

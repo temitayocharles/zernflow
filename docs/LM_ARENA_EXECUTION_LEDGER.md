@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Implement provider-neutral email/message contracts, local publishing/editorial drafts, knowledge-source configuration and safe browser-session presentation seams without inventing external provider execution endpoints. Extend real-data workload/CRM analytics and SLA notifications using persisted work items.
+Build real-data operator analytics from work items/CRM/flow/sequence/conversation projections and add idempotent SLA warning/breach notification refresh. Then run full migration history tests and review API authorization, reference selectors, audit immutability and responsive operator screens.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -100,3 +100,11 @@ Implement provider-neutral email/message contracts, local publishing/editorial d
 - Migration 00023 adds internal conversation notes, validated/deduplicated member mentions, canned replies, recipient-isolated notifications, and automatic assignment/escalation/status/mention notifications. Notifications permit only recipient read-state changes; note content never dispatches provider messages.
 - Inbox template insertion requires operator review. Notification and canned-reply management screens added.
 - LOCAL VALIDATION: domain/PostgreSQL suite passed (195 tests before six new collaboration route cases); six route authorization/attribution/failure tests pass; production build passes. Full suite follows in next slice.
+
+## Email/editorial/knowledge/browser integration slice
+- CODE COMPLETE: migration 00024 persists owner-managed mailbox sender identities and external knowledge source references, plus local editorial drafts/campaign groups/schedule intent, per-channel variants/media references and owner review. Edits invalidate approval; DB cannot claim published/queued state for local planning.
+- Product screens create/edit these real records and show unavailable execution/indexing/connection states honestly. Publishing executor and email envelope/reply/attachment/delivery contracts are provider-neutral and do not expand Postiz.
+- Added configurable external knowledge retrieval adapter and UI: workspace-scoped enabled sources, bounded query/response/timeout, no redirects, verified citation source refs and safe text/URL presentation. Endpoint is explicitly a replaceable seam, not an invented Gateway route.
+- Safe browser-session contract fails closed for MFA/challenge/expired/revoked/degraded/unpermitted sessions and unknown capabilities.
+- LOCAL VALIDATION: 224 tests / 31 files, typecheck/build pass, lint 44 baseline warnings. PostgreSQL executes migration 00024 and checks editorial approval invalidation and owner-only source/mailbox configuration.
+- Exact external contracts, status semantics and boundaries: `docs/PRODUCT_INTEGRATION_SEAMS.md`.
