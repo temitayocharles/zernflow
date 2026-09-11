@@ -1124,6 +1124,7 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
+      operator_metrics: { Args:{p_workspace_id:string}; Returns:Json };
       increment_unread: {
         Args: {
           conv_id: string;

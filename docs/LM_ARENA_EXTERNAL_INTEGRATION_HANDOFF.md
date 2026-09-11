@@ -167,3 +167,27 @@ Real source citations and provider operations with trustworthy state, source/ten
 Foreign citations, fake connected/published states, HTML injection, speculative endpoint calls, or bypass of provider controls.
 ### Rollback consideration
 Disable external adapter configuration and retain local drafts/source/mailbox records. Do not erase provider state or credentials during rollback.
+
+## ITEM: Analytics and SLA notification rollout
+### Code status
+COMPLETE
+### Repository evidence
+Commit: analytics slice on PR #11.
+Files: migration 00025; `lib/analytics/`, `lib/service-desk/notifications.ts`, `/dashboard/operations`, `/api/v1/notifications/refresh`.
+Tests: full migration-history PostgreSQL test and SLA notification dedupe/recipient/objective tests.
+### External system
+Supabase / Northflank
+### Exact action required
+Apply 00025 and accept aggregate counts against database truth for multiple tenants. For timed alerts, integrate the same deterministic signal logic into an approved existing scheduler; current product provides explicit manual review only.
+### Environment variables / secret names
+Existing Supabase configuration; service role required for server-owned notification inserts.
+### Endpoint or callback expected
+`/dashboard/operations`, POST `/api/v1/notifications/refresh`; PostgreSQL `operator_metrics(uuid)`.
+### Verification procedure
+Compare full-workspace aggregates, verify foreign workspace RPC denied, keep currency totals separate, review SLA notifications twice and confirm deduplication. Acknowledge manual review's explicit 500-item cap.
+### Expected success result
+Real aggregate counts and recipient-isolated deduplicated notifications, without false timed-alert claims.
+### Failure symptoms
+Sampled totals presented as whole workspace, cross-tenant metrics, duplicate signals, or silent scan truncation.
+### Rollback consideration
+Retain accumulated records/notifications; roll back UI independently. Do not drop shared metrics data or reset work state.

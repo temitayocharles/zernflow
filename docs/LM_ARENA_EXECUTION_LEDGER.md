@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Build real-data operator analytics from work items/CRM/flow/sequence/conversation projections and add idempotent SLA warning/breach notification refresh. Then run full migration history tests and review API authorization, reference selectors, audit immutability and responsive operator screens.
+Harden remaining product boundaries: preserve reference selections beyond selector limits, enforce customer-profile identity in the database, add scoped team directory for assignment/mentions, verify API conflicts and tenant checks, then complete responsive navigation and run the full validation loop.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -108,3 +108,9 @@ Build real-data operator analytics from work items/CRM/flow/sequence/conversatio
 - Safe browser-session contract fails closed for MFA/challenge/expired/revoked/degraded/unpermitted sessions and unknown capabilities.
 - LOCAL VALIDATION: 224 tests / 31 files, typecheck/build pass, lint 44 baseline warnings. PostgreSQL executes migration 00024 and checks editorial approval invalidation and owner-only source/mailbox configuration.
 - Exact external contracts, status semantics and boundaries: `docs/PRODUCT_INTEGRATION_SEAMS.md`.
+
+## Real-data analytics and SLA notifications
+- CODE COMPLETE: migration 00025 provides explicitly authorized whole-workspace PostgreSQL aggregates for backlog, SLA warnings/breaches, unassigned/escalated work, recorded response/resolution timings, contact growth, company totals, pipeline value separated by currency, and channel/conversation/flow/sequence projections. No sampled-page totals or fabricated human/AI/provider health metrics.
+- Added operator analytics screen and manual SLA review for the recipient's oldest 500 assigned open items. Warning/breach notifications use stable per-objective dedupe keys; limits and lack of background scheduling are explicit in UI.
+- Test fixture now applies the **entire migration history 00001–00025** in lexical order using PGlite PostgreSQL, with minimal Supabase Auth roles/schema/publication fixture and uuid-ossp equivalent. This is schema/RLS validation, not live Supabase certification.
+- LOCAL VALIDATION: typecheck, tests and production build pass; 228 tests across 32 files, lint 44 baseline warnings.

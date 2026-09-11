@@ -1,19 +1,16 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 const db=new PGlite();
 const ws='10000000-0000-4000-8000-000000000001', other='10000000-0000-4000-8000-000000000002';
 const user='20000000-0000-4000-8000-000000000001';
 const company='30000000-0000-4000-8000-000000000001';
 beforeAll(async()=>{
-  await db.exec(`create publication supabase_realtime; create schema auth; create table auth.users(id uuid primary key); create role authenticated; create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; create function uuid_generate_v4() returns uuid language sql as $$ select gen_random_uuid() $$;`);
+  await db.exec(`create publication supabase_realtime; create schema auth; create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb); create role authenticated; create role service_role; create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; create function uuid_generate_v4() returns uuid language sql as $$ select gen_random_uuid() $$;`);
   await db.exec(readFileSync('supabase/migrations/00001_initial_schema.sql','utf8').replace('create extension if not exists "uuid-ossp";',''));
-  await db.exec(readFileSync('supabase/migrations/00002_rls_policies.sql','utf8'));
-  await db.exec(readFileSync('supabase/migrations/00016_harden_configuration_rls.sql','utf8'));
-  await db.exec(readFileSync('supabase/migrations/00021_crm_foundations.sql','utf8'));
-  await db.exec(readFileSync('supabase/migrations/00022_work_items.sql','utf8'));
-  await db.exec(readFileSync('supabase/migrations/00023_collaboration_notifications.sql','utf8'));
-  await db.exec(readFileSync('supabase/migrations/00024_editorial_knowledge_email.sql','utf8'));
+  for(const file of readdirSync('supabase/migrations').filter(f=>/^\d{5}_.*\.sql$/.test(f)&&!f.startsWith('00001')).sort()){
+    await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
+  }
   await db.exec(`insert into auth.users values('${user}'); insert into workspaces(id,name,slug) values('${ws}','A','a'),('${other}','B','b'); insert into workspace_members(workspace_id,user_id) values('${ws}','${user}'); grant usage on schema public,auth to authenticated; grant select,insert,update,delete on all tables in schema public to authenticated; select set_config('request.jwt.claim.sub','${user}',false); set role authenticated;`);
 },30000);
 afterAll(async()=>{await db.close();});
@@ -107,5 +104,12 @@ describe('Editorial and external source configuration',()=>{
   await expect(db.exec(`insert into mailbox_identities(workspace_id,name,address) values('${ws}','Support','support@example.com')`)).rejects.toThrow();
   await db.exec(`reset role;update workspace_members set role='owner' where workspace_id='${ws}' and user_id='${user}';set role authenticated;`);
   await db.exec(`insert into knowledge_sources(workspace_id,name,source_ref) values('${ws}','Knowledge','source');insert into mailbox_identities(workspace_id,name,address) values('${ws}','Support','support@example.com')`);
+ });
+});
+
+describe('Operator aggregate security',()=>{
+ it('aggregates without sampling and refuses foreign workspaces',async()=>{
+  const result=await db.query<{metrics:{work_items:{total:number};companies:number}}>(`select operator_metrics('${ws}') as metrics`);expect(result.rows[0].metrics.work_items.total).toBeGreaterThan(0);expect(result.rows[0].metrics.companies).toBe(1);
+  await expect(db.exec(`select operator_metrics('${other}')`)).rejects.toThrow();
  });
 });

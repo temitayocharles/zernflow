@@ -51,6 +51,7 @@ const navigation = [
   { name: "CRM", href: "/dashboard/crm/companies", icon: Users },
   { name: "Broadcasts", href: "/dashboard/broadcasts", icon: Radio },
   { name: "Sequences", href: "/dashboard/sequences", icon: ListOrdered },
+  { name: "Operator analytics", href: "/dashboard/operations", icon: BarChart3 },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Growth", href: "/dashboard/growth", icon: Sprout },
   { name: "Channels", href: "/dashboard/channels", icon: Plug },
