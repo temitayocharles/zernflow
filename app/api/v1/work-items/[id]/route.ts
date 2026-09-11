@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, { params }: Context) {
   try {
     const id = uuid((await params).id, "id");
     const { supabase, workspaceId } = await productContext();
-    const { version, ...input } = parseWorkInput(await request.json(), true);
+    const { version, ...input } = parseWorkInput(await readJson(request), true);
     const { data, error } = await supabase
       .from("work_items")
       .update(input)

@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -16,7 +17,8 @@ const targets = {
 async function target(request: Request) {
   const url = new URL(request.url);
   const kind = url.searchParams.get("kind") ?? "";
-  if (!(kind in targets)) throw new ApiError(400, "Invalid activity target");
+  if (!Object.hasOwn(targets, kind))
+    throw new ApiError(400, "Invalid activity target");
   const id = uuid(url.searchParams.get("id"), "id");
   const ctx = await productContext();
   const { data, error } = await ctx.supabase
@@ -59,7 +61,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { supabase, workspaceId, kind, id, user } = await target(request);
-    const input = object(await request.json());
+    const input = object(await readJson(request));
     const body = text(input.body, "note", 10000, true);
     const mentions = input.mention_ids ?? [];
     if (!Array.isArray(mentions) || mentions.length > 20)

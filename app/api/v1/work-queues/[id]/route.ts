@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -13,7 +14,7 @@ export async function PATCH(
   try {
     const id = uuid((await params).id, "id");
     const { supabase, workspaceId } = await productContext();
-    const input = object(await request.json());
+    const input = object(await readJson(request));
     const name = text(input.name, "name", 200, true),
       description = text(input.description ?? "", "description", 10000),
       version = integer(input.version, "version", 1);

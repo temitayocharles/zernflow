@@ -37,8 +37,9 @@ export function json(value: unknown, status = 200) {
 export function failure(error: unknown) {
   if (error instanceof ApiError)
     return json({ error: error.message }, error.status);
-  if (error instanceof InputError || error instanceof SyntaxError)
-    return json({ error: error.message }, 400);
+  if (error instanceof SyntaxError)
+    return json({ error: "Invalid JSON body" }, 400);
+  if (error instanceof InputError) return json({ error: error.message }, 400);
   return json({ error: "Unable to complete the request" }, 500);
 }
 export function databaseError(error: { code?: string } | null) {
@@ -56,4 +57,34 @@ export function databaseError(error: { code?: string } | null) {
     503,
     "Data is unavailable. Confirm required migrations are applied.",
   );
+}
+
+/** Bound JSON parsing before materializing user-controlled payloads. */
+export async function readJson(
+  request: Request,
+  maxBytes = 262144,
+): Promise<unknown> {
+  const reader = request.body?.getReader();
+  if (!reader) throw new InputError("A JSON body is required");
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maxBytes)
+        throw new ApiError(413, "Request body exceeds 256 KiB");
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel();
+  }
+  const body = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return JSON.parse(new TextDecoder().decode(body));
 }

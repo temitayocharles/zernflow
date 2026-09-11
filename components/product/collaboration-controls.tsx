@@ -1,4 +1,6 @@
 "use client";
+import { ApprovalQueue } from "./approval-queue";
+import { AutonomyPolicyPanel } from "./autonomy-policy";
 import { useState } from "react";
 import type { GatewayConversationControl } from "@/lib/social-gateway/types";
 export function CollaborationControls({
@@ -99,12 +101,26 @@ export function CollaborationControls({
           {control.escalated ? "yes" : "no"} · Version {control.version}
         </p>
       )}
-      <p className="mt-2 text-muted-foreground">
-        Autonomy: Allow / Ask / Deny / Limit are Gateway-owned policies.
-        Approval queue and policy editing are unavailable until scoped
-        read/write contracts are verified. No local setting bypasses Gateway
-        approval.
-      </p>
+      <div className="mt-4 space-y-4">
+        <AutonomyPolicyPanel
+          policy={null}
+          agentRef={
+            control?.assignment_type === "agent" ? control.assignee_ref : null
+          }
+          scope="Current conversation; Gateway permission scope not loaded"
+          state="unavailable"
+          canManage={isOwner}
+        />
+        <ApprovalQueue
+          projection={{
+            state: "unavailable",
+            requests: [],
+            updatedAt: null,
+            error: null,
+          }}
+          canReview={isOwner}
+        />
+      </div>
     </details>
   );
 }

@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import { isCrmResource, parseCrmInput } from "@/lib/crm/contracts";
 import { uuid } from "@/lib/product/validation";
 import {
@@ -37,7 +38,7 @@ export async function PATCH(request: Request, { params }: Context) {
     const { supabase, workspaceId } = await productContext();
     const { version, ...input } = parseCrmInput(
       resource,
-      await request.json(),
+      await readJson(request),
       true,
     );
     const { data, error } = await supabase

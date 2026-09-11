@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import { isCrmResource, parseCrmInput } from "@/lib/crm/contracts";
 import {
   ApiError,
@@ -45,7 +46,7 @@ export async function POST(request: Request, { params }: Context) {
     if (!isCrmResource(resource))
       throw new ApiError(404, "Unknown CRM resource");
     const { supabase, workspaceId } = await productContext();
-    const input = parseCrmInput(resource, await request.json());
+    const input = parseCrmInput(resource, await readJson(request));
     const row = {
       ...input,
       workspace_id: workspaceId,

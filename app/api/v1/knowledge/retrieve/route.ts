@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -10,7 +11,7 @@ import { HttpKnowledgeClient } from "@/lib/knowledge/client";
 export async function POST(request: Request) {
   try {
     const { supabase, workspaceId } = await productContext();
-    const input = object(await request.json());
+    const input = object(await readJson(request));
     const query = text(input.query, "query", 4000, true);
     if (
       !Array.isArray(input.sourceIds) ||

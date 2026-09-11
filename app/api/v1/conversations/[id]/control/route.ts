@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -23,7 +24,7 @@ export async function POST(
   try {
     const id = uuid((await params).id, "conversation");
     const { supabase, user, workspaceId, role } = await productContext();
-    const command = parseCollaborationCommand(await request.json());
+    const command = parseCollaborationCommand(await readJson(request));
     if (requiresOwner(command) && role !== "owner")
       throw new ApiError(403, "Workspace owner access required");
     const { data: conversation, error } = await supabase
@@ -55,22 +56,20 @@ export async function POST(
                   ? { assignmentType: "human", assigneeRef: user.id }
                   : { assignmentType: "unassigned" },
             );
-    const audit = await service
-      .from("product_activity")
-      .insert({
-        workspace_id: workspaceId,
-        entity_type: "conversations",
-        entity_id: id,
-        actor_id: user.id,
-        action: `gateway.${command.action}`,
-        changes: {
-          gateway_version: control.version,
-          assignment_type: control.assignment_type,
-          human_takeover: control.human_takeover,
-          escalated: control.escalated,
-          ...("reason" in command ? { reason: command.reason } : {}),
-        },
-      });
+    const audit = await service.from("product_activity").insert({
+      workspace_id: workspaceId,
+      entity_type: "conversations",
+      entity_id: id,
+      actor_id: user.id,
+      action: `gateway.${command.action}`,
+      changes: {
+        gateway_version: control.version,
+        assignment_type: control.assignment_type,
+        human_takeover: control.human_takeover,
+        escalated: control.escalated,
+        ...("reason" in command ? { reason: command.reason } : {}),
+      },
+    });
     return json({
       control,
       auditRecorded: !audit.error,

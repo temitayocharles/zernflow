@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { supabase, workspaceId } = await productContext();
-    const input = parseWorkInput(await request.json());
+    const input = parseWorkInput(await readJson(request));
     const { data, error } = await supabase
       .from("work_items")
       .insert({

@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Complete reusable approval-queue and autonomy-policy presentation state machines (with execution explicitly unavailable until scoped Gateway contracts are verified), then audit new source/API boundaries and update migration/source-of-truth/PR validation evidence. Do not conflate DOM fixtures with live acceptance.
+Run repository-wide security/validation review, verify the pushed branch and PR evidence, and close remaining safe product defects discovered by source/DOM/SQL tests. Start with foreign-reference audit-invalidation tests for editorial variants and API authorization tests for knowledge source selection; do not enable unverifiable external execution contracts.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -128,3 +128,9 @@ Complete reusable approval-queue and autonomy-policy presentation state machines
 - Added explicit confirmation bulk UI for the current work-item page, canned-reply editing, queue editing and paginated configuration/notification/template lists. Removed ineffective name search from profile view.
 - Added React DOM interaction tests (test-only jsdom/Testing Library): failed/stale saves retain edits and never navigate as success, out-of-page references remain selected, inbox ignores late superseded responses, history pages deduplicate, failed reads expose working retry.
 - LOCAL VALIDATION: 257 tests / 38 files; complete migrations 00001–00027 execute in PostgreSQL test fixture; typecheck/lint/Node 24 build pass. DOM tests are not live-browser/provider certification.
+
+## Approval/policy presentation and bounded API requests
+- Completed reusable approval queue and Allow/Ask/Deny/Limit presentation state machines with permission/degradation gates, explicit reasons, pending/success/failure behavior and callback seams. Production inbox keeps them unavailable until authorized Gateway reads/writes are verified; test callbacks exist only in test files and no fake success endpoint was added.
+- Six new React DOM cases verify unknown policy is not presented as an applied default, degraded queues cannot approve, failed decisions retain pending state, and only confirmed matching decisions transition UI.
+- New product JSON APIs now bound request bodies to 256 KiB before parsing. Parser/unexpected errors do not echo payloads or upstream secrets. Activity entity allowlist excludes inherited object properties.
+- LOCAL VALIDATION: 266 tests / 41 files, typecheck, lint (44 baseline warnings), Node 24 production build pass.

@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -21,7 +22,7 @@ export async function POST(
     const { supabase, workspaceId, role } = await productContext();
     if (ownerConfiguration(resource) && role !== "owner")
       throw new ApiError(403, "Workspace owner required");
-    const input = parseConfiguration(resource, await request.json());
+    const input = parseConfiguration(resource, await readJson(request));
     const { data, error } = await supabase
       .from(resource)
       .insert({

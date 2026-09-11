@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -9,7 +10,7 @@ import { parseBulkWorkChanges } from "@/lib/service-desk/bulk";
 export async function POST(request: Request) {
   try {
     const { supabase, workspaceId } = await productContext();
-    const changes = parseBulkWorkChanges(await request.json());
+    const changes = parseBulkWorkChanges(await readJson(request));
     const { data, error } = await supabase.rpc("bulk_update_work_items", {
       p_workspace_id: workspaceId,
       p_changes: changes,

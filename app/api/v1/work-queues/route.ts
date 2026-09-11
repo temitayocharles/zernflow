@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   databaseError,
   failure,
@@ -8,7 +9,7 @@ import { object, text } from "@/lib/product/validation";
 export async function POST(request: Request) {
   try {
     const { supabase, workspaceId } = await productContext();
-    const input = object(await request.json());
+    const input = object(await readJson(request));
     const name = text(input.name, "name", 200, true);
     const { data, error } = await supabase
       .from("work_queues")

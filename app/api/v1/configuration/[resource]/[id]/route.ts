@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   ApiError,
   databaseError,
@@ -24,7 +25,7 @@ export async function PATCH(
       throw new ApiError(403, "Workspace owner required");
     const { version, ...input } = parseConfiguration(
       resource,
-      await request.json(),
+      await readJson(request),
       true,
     );
     const { data, error } = await supabase

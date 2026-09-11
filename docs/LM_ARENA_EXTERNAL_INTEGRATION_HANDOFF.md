@@ -239,3 +239,27 @@ All-or-nothing version-safe updates and usable editable/paginated operator resou
 Partial writes, silent stale overwrites, duplicate notifications or cursor/list truncation presented as complete.
 ### Rollback consideration
 Disable bulk UI/route if needed, retain work-item data and activity; do not undo successful business transitions automatically.
+
+## ITEM: Approval/policy UI adapter activation
+### Code status
+PARTIAL
+### Repository evidence
+Commit: approval/policy request-hardening slice on PR #11.
+Files: `components/product/approval-queue.tsx`, `components/product/autonomy-policy.tsx`, `lib/collaboration/contracts.ts`.
+Tests: six React DOM confirmation/failure/degraded-state cases.
+### External system
+Agent Social Gateway
+### Exact action required
+Verify an authenticated request-to-workspace read and policy read/write contract. Supply authorized projections and decision/save callbacks to the completed components. Keep production controls unavailable until then; do not expose existing approve-by-ID client methods without validating request ownership.
+### Environment variables / secret names
+Existing Gateway operator/admin/agent variables only; no new guessed values.
+### Endpoint or callback expected
+No unverified HTTP path assumed. Component contracts: `ApprovalDecision` and `onSave(AutonomyPolicy)` in the named files.
+### Verification procedure
+Check member/owner review permissions, stale decisions, rejected policy updates, matching request identity, scope and actor attribution against real Gateway responses.
+### Expected success result
+Only authorized, confirmed Gateway decisions update displayed policy/request status.
+### Failure symptoms
+Decisions on unknown tenant requests, UI transitions after failed writes, or an unknown policy displayed as applied Allow/Ask.
+### Rollback consideration
+Remove adapter callbacks to return components to explicit unavailable/read-only states; do not undo already executed Gateway operations automatically.

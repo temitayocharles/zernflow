@@ -1,3 +1,4 @@
+import { readJson } from "@/lib/product/api";
 import {
   databaseError,
   failure,
@@ -23,7 +24,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { supabase, workspaceId } = await productContext();
-    const input = object(await request.json());
+    const input = object(await readJson(request));
     const { data, error } = await supabase
       .from("canned_replies")
       .insert({
