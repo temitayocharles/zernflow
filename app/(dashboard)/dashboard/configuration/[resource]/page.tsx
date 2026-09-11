@@ -1,2 +1,80 @@
-import Link from 'next/link';import {notFound} from 'next/navigation';import {getWorkspace} from '@/lib/workspace';import {configurationForms} from '@/lib/product/forms';import {RecordForm} from '@/components/product/record-form';import {configResource,ownerConfiguration} from '@/lib/product/config-contracts';
-export default async function Configuration({params}:{params:Promise<{resource:string}>}){const {resource}=await params;if(!configResource(resource)||resource==='editorial_variants')notFound();const {supabase,workspace,role}=await getWorkspace();const form=configurationForms[resource];const {data,error}=await supabase.from(resource).select().eq('workspace_id',workspace.id).order('created_at',{ascending:false}).limit(100);return <main className="space-y-5 overflow-auto p-6"><h1 className="text-2xl font-semibold">{form.title}</h1><p className="max-w-3xl text-sm text-muted-foreground">{form.description}</p>{error?<p role="alert">Data unavailable. Apply migration 00024.</p>:<>{(!ownerConfiguration(resource)||role==='owner')&&<details className="rounded-lg border border-border p-4"><summary>Create configuration</summary><RecordForm fields={form.fields} endpoint={`/api/v1/configuration/${resource}`} redirectBase={`/dashboard/configuration/${resource}`}/></details>}{resource==='knowledge_sources'&&<Link className="block text-sm underline" href="/dashboard/knowledge">Test retrieval and inspect citations</Link>}<p className="text-xs text-muted-foreground">Latest 100 records</p>{data?.map(item=><Link key={item.id} href={`/dashboard/configuration/${resource}/${item.id}`} className="block rounded-lg border border-border p-4"><p className="font-medium">{item.name}</p><p className="text-xs text-muted-foreground">{'state' in item?`Editorial ${item.state} · Not dispatched`:'enabled' in item?`Retrieval ${item.enabled?'enabled':'disabled'} · Indexing status externally managed`:'Runtime mailbox connection not verified'}</p></Link>)}{!data?.length&&<p className="text-sm text-muted-foreground">No configuration yet.</p>}</>}</main>;}
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getWorkspace } from "@/lib/workspace";
+import { configurationForms } from "@/lib/product/forms";
+import { RecordForm } from "@/components/product/record-form";
+import {
+  configResource,
+  ownerConfiguration,
+} from "@/lib/product/config-contracts";
+export default async function Configuration({
+  params,
+}: {
+  params: Promise<{ resource: string }>;
+}) {
+  const { resource } = await params;
+  if (!configResource(resource) || resource === "editorial_variants")
+    notFound();
+  const { supabase, workspace, role } = await getWorkspace();
+  const form = configurationForms[resource];
+  const { data, error } = await supabase
+    .from(resource)
+    .select()
+    .eq("workspace_id", workspace.id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  return (
+    <main className="space-y-5 overflow-auto p-6">
+      <h1 className="text-2xl font-semibold">{form.title}</h1>
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        {form.description}
+      </p>
+      {error ? (
+        <p role="alert">Data unavailable. Apply migration 00024.</p>
+      ) : (
+        <>
+          {(!ownerConfiguration(resource) || role === "owner") && (
+            <details className="rounded-lg border border-border p-4">
+              <summary>Create configuration</summary>
+              <RecordForm
+                fields={form.fields}
+                endpoint={`/api/v1/configuration/${resource}`}
+                redirectBase={`/dashboard/configuration/${resource}`}
+              />
+            </details>
+          )}
+          {resource === "knowledge_sources" && (
+            <Link
+              className="block text-sm underline"
+              href="/dashboard/knowledge"
+            >
+              Test retrieval and inspect citations
+            </Link>
+          )}
+          <p className="text-xs text-muted-foreground">Latest 100 records</p>
+          {data?.map((item) => (
+            <Link
+              key={item.id}
+              href={`/dashboard/configuration/${resource}/${item.id}`}
+              className="block rounded-lg border border-border p-4"
+            >
+              <p className="font-medium">{item.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {"state" in item
+                  ? `Editorial ${item.state} · Not dispatched`
+                  : "enabled" in item
+                    ? `Retrieval ${item.enabled ? "enabled" : "disabled"} · Indexing status externally managed`
+                    : "Runtime mailbox connection not verified"}
+              </p>
+            </Link>
+          ))}
+          {!data?.length && (
+            <p className="text-sm text-muted-foreground">
+              No configuration yet.
+            </p>
+          )}
+        </>
+      )}
+    </main>
+  );
+}

@@ -191,3 +191,27 @@ Real aggregate counts and recipient-isolated deduplicated notifications, without
 Sampled totals presented as whole workspace, cross-tenant metrics, duplicate signals, or silent scan truncation.
 ### Rollback consideration
 Retain accumulated records/notifications; roll back UI independently. Do not drop shared metrics data or reset work state.
+
+## ITEM: Product integrity and teammate directory rollout
+### Code status
+COMPLETE
+### Repository evidence
+Commit: product-hardening slice on PR #11.
+Files: migration 00026, teammate directory API/selectors, responsive dashboard navigation, CRM API tests.
+Tests: entire 00001–00026 history; 241 tests / 35 files at this checkpoint.
+### External system
+Supabase / browser / Northflank
+### Exact action required
+Apply 00026; test ordinary member and owner directory access, profile identity constraints, assignee cleanup when removing a member, and desktop/mobile navigation in the authenticated application.
+### Environment variables / secret names
+Existing Supabase configuration only.
+### Endpoint or callback expected
+`/api/v1/product/members`; PostgreSQL `workspace_operator_directory(uuid)`.
+### Verification procedure
+Verify no auth email/secrets/unrelated metadata returned, other workspace directory RPC rejected, existing relationships outside initial selector limits preserved, mobile dialog focus/Escape behavior correct.
+### Expected success result
+Safe human-readable teammate selection and consistent responsive operator navigation.
+### Failure symptoms
+Foreign directory rows, leaked auth metadata, cleared relationships, blocked member departure, or inaccessible mobile controls.
+### Rollback consideration
+Keep recorded customer/work data. Revert UI independently of constraints; never loosen RLS to repair a rollout.

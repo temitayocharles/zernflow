@@ -1,14 +1,117 @@
-import 'server-only';
-import type {KnowledgeClient,RetrievalRequest,RetrievalResult,Citation} from './contracts';
-import {choice,InputError,object,text} from '@/lib/product/validation';
-export function parseRetrieval(value:unknown,allowedSources:readonly string[]):RetrievalResult{
- const data=object(value);if(!Array.isArray(data.citations)||data.citations.length>20)throw new InputError('Invalid retrieval citations');
- const citations:Citation[]=data.citations.map(value=>{const c=object(value);const sourceRef=text(c.sourceRef,'sourceRef',500,true);if(!allowedSources.includes(sourceRef))throw new InputError('Retrieval returned an unauthorized source');let url:string|null=null;if(c.url){const parsed=new URL(text(c.url,'citation URL',2048));if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password)throw new InputError('Unsafe citation URL');url=parsed.toString();}const score=c.score===null||c.score===undefined?null:c.score;if(score!==null&&(typeof score!=='number'||!Number.isFinite(score)))throw new InputError('Invalid citation score');return {sourceRef,title:text(c.title,'title',500),excerpt:text(c.excerpt,'excerpt',10000),url,score};});
- return {requestId:text(data.requestId,'requestId',200,true),indexingStatus:choice(data.indexingStatus,'indexing status',['ready','partial','indexing','unknown']) as RetrievalResult['indexingStatus'],citations};
+import "server-only";
+import type {
+  KnowledgeClient,
+  RetrievalRequest,
+  RetrievalResult,
+  Citation,
+} from "./contracts";
+import { choice, InputError, object, text } from "@/lib/product/validation";
+export function parseRetrieval(
+  value: unknown,
+  allowedSources: readonly string[],
+): RetrievalResult {
+  const data = object(value);
+  if (!Array.isArray(data.citations) || data.citations.length > 20)
+    throw new InputError("Invalid retrieval citations");
+  const citations: Citation[] = data.citations.map((value) => {
+    const c = object(value);
+    const sourceRef = text(c.sourceRef, "sourceRef", 500, true);
+    if (!allowedSources.includes(sourceRef))
+      throw new InputError("Retrieval returned an unauthorized source");
+    let url: string | null = null;
+    if (c.url) {
+      const parsed = new URL(text(c.url, "citation URL", 2048));
+      if (
+        !["http:", "https:"].includes(parsed.protocol) ||
+        parsed.username ||
+        parsed.password
+      )
+        throw new InputError("Unsafe citation URL");
+      url = parsed.toString();
+    }
+    const score = c.score === null || c.score === undefined ? null : c.score;
+    if (
+      score !== null &&
+      (typeof score !== "number" || !Number.isFinite(score))
+    )
+      throw new InputError("Invalid citation score");
+    return {
+      sourceRef,
+      title: text(c.title, "title", 500),
+      excerpt: text(c.excerpt, "excerpt", 10000),
+      url,
+      score,
+    };
+  });
+  return {
+    requestId: text(data.requestId, "requestId", 200, true),
+    indexingStatus: choice(data.indexingStatus, "indexing status", [
+      "ready",
+      "partial",
+      "indexing",
+      "unknown",
+    ]) as RetrievalResult["indexingStatus"],
+    citations,
+  };
 }
 /** URL is supplied only by server deployment configuration, not source settings or user input. */
-export class HttpKnowledgeClient implements KnowledgeClient{
- private url:URL;
- constructor(url:string,private token:string,private fetcher:typeof fetch=fetch){this.url=new URL(url);if(this.url.protocol!=='https:'||this.url.username||this.url.password||this.url.hash)throw new Error('Knowledge endpoint must be an HTTPS URL without URL credentials');if(!token.trim())throw new Error('Knowledge API token required');}
- async retrieve(request:RetrievalRequest):Promise<RetrievalResult>{const response=await this.fetcher(this.url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${this.token}`},body:JSON.stringify(request),signal:AbortSignal.timeout(10000),redirect:'error',cache:'no-store'});if(!response.ok)throw new Error('Knowledge service unavailable or request rejected');const reader=response.body?.getReader();if(!reader)throw new Error('Empty retrieval response');let size=0;const chunks:Uint8Array[]=[];try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>1_000_000)throw new Error('Retrieval response too large');chunks.push(value);}}finally{await reader.cancel();}const combined=new Uint8Array(size);let offset=0;for(const chunk of chunks){combined.set(chunk,offset);offset+=chunk.length;}return parseRetrieval(JSON.parse(new TextDecoder().decode(combined)),request.sourceRefs);}
+export class HttpKnowledgeClient implements KnowledgeClient {
+  private url: URL;
+  constructor(
+    url: string,
+    private token: string,
+    private fetcher: typeof fetch = fetch,
+  ) {
+    this.url = new URL(url);
+    if (
+      this.url.protocol !== "https:" ||
+      this.url.username ||
+      this.url.password ||
+      this.url.hash
+    )
+      throw new Error(
+        "Knowledge endpoint must be an HTTPS URL without URL credentials",
+      );
+    if (!token.trim()) throw new Error("Knowledge API token required");
+  }
+  async retrieve(request: RetrievalRequest): Promise<RetrievalResult> {
+    const response = await this.fetcher(this.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.token}`,
+      },
+      body: JSON.stringify(request),
+      signal: AbortSignal.timeout(10000),
+      redirect: "error",
+      cache: "no-store",
+    });
+    if (!response.ok)
+      throw new Error("Knowledge service unavailable or request rejected");
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Empty retrieval response");
+    let size = 0;
+    const chunks: Uint8Array[] = [];
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 1_000_000) throw new Error("Retrieval response too large");
+        chunks.push(value);
+      }
+    } finally {
+      await reader.cancel();
+    }
+    const combined = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return parseRetrieval(
+      JSON.parse(new TextDecoder().decode(combined)),
+      request.sourceRefs,
+    );
+  }
 }

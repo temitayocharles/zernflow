@@ -40,7 +40,7 @@ export default async function ContactDetailPage({
         .order("last_message_at", { ascending: false }),
       supabase
         .from("contact_custom_fields")
-        .select("value, custom_field_definitions(name, slug, field_type)")
+        .select("value, custom_field_definitions(name, slug, type)")
         .eq("contact_id", contactId),
     ]);
 

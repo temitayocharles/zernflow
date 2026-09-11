@@ -1,4 +1,63 @@
-export type BrowserSessionStatus='human_login_required'|'mfa_required'|'challenge_required'|'healthy'|'degraded'|'expired'|'revoked';
-export interface BrowserSessionProjection {connectorRef:string;status:BrowserSessionStatus;capabilities:Record<string,boolean>;lastSuccessfulOperationAt:string|null;expiresAt:string|null;permittedUseConfirmed:boolean}
-export function browserSessionPresentation(session:BrowserSessionProjection,now=Date.now()){const labels:Record<BrowserSessionStatus,string>={human_login_required:'Human login required',mfa_required:'Complete MFA in the provider interface',challenge_required:'Human attention required; security challenges are never bypassed',healthy:'Session reported healthy',degraded:'Session degraded; reconnect may be needed',expired:'Session expired; reconnect',revoked:'Session revoked'};return {label:labels[session.status],canExecute:session.status==='healthy'&&session.permittedUseConfirmed&&(session.expiresAt===null||(Number.isFinite(Date.parse(session.expiresAt))&&Date.parse(session.expiresAt)>now)),reconnectRequired:['expired','revoked','human_login_required'].includes(session.status),requiresHuman:['human_login_required','mfa_required','challenge_required'].includes(session.status)};}
-export function browserCanPerform(session:BrowserSessionProjection,capability:string){return browserSessionPresentation(session).canExecute&&Object.hasOwn(session.capabilities,capability)&&session.capabilities[capability]===true;}
+export type BrowserSessionStatus =
+  | "human_login_required"
+  | "mfa_required"
+  | "challenge_required"
+  | "healthy"
+  | "degraded"
+  | "expired"
+  | "revoked";
+export interface BrowserSessionProjection {
+  connectorRef: string;
+  status: BrowserSessionStatus;
+  capabilities: Record<string, boolean>;
+  lastSuccessfulOperationAt: string | null;
+  expiresAt: string | null;
+  permittedUseConfirmed: boolean;
+}
+export function browserSessionPresentation(
+  session: BrowserSessionProjection,
+  now = Date.now(),
+) {
+  const expired =
+    session.expiresAt !== null &&
+    (!Number.isFinite(Date.parse(session.expiresAt)) ||
+      Date.parse(session.expiresAt) <= now);
+  const status: BrowserSessionStatus = expired ? "expired" : session.status;
+  const labels: Record<BrowserSessionStatus, string> = {
+    human_login_required: "Human login required",
+    mfa_required: "Complete MFA in the provider interface",
+    challenge_required:
+      "Human attention required; security challenges are never bypassed",
+    healthy: "Session reported healthy",
+    degraded: "Session degraded; reconnect may be needed",
+    expired: "Session expired; reconnect",
+    revoked: "Session revoked",
+  };
+  return {
+    label: labels[status],
+    canExecute:
+      status === "healthy" &&
+      session.permittedUseConfirmed &&
+      (session.expiresAt === null ||
+        (Number.isFinite(Date.parse(session.expiresAt)) &&
+          Date.parse(session.expiresAt) > now)),
+    reconnectRequired: ["expired", "revoked", "human_login_required"].includes(
+      status,
+    ),
+    requiresHuman: [
+      "human_login_required",
+      "mfa_required",
+      "challenge_required",
+    ].includes(status),
+  };
+}
+export function browserCanPerform(
+  session: BrowserSessionProjection,
+  capability: string,
+) {
+  return (
+    browserSessionPresentation(session).canExecute &&
+    Object.hasOwn(session.capabilities, capability) &&
+    session.capabilities[capability] === true
+  );
+}

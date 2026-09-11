@@ -1124,6 +1124,7 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
+      workspace_operator_directory: {Args:{p_workspace_id:string};Returns:{user_id:string;display_name:string;role:string}[]};
       operator_metrics: { Args:{p_workspace_id:string}; Returns:Json };
       increment_unread: {
         Args: {

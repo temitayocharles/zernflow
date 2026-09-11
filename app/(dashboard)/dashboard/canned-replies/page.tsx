@@ -1,2 +1,43 @@
-import {getWorkspace} from '@/lib/workspace';import {RecordForm} from '@/components/product/record-form';
-export default async function Canned(){const {supabase,workspace}=await getWorkspace();const {data,error}=await supabase.from('canned_replies').select().eq('workspace_id',workspace.id).order('name').limit(200);return <main className="space-y-4 overflow-auto p-6"><h1 className="text-2xl font-semibold">Canned replies</h1><p className="text-sm text-muted-foreground">Workspace templates inserted into the composer for review. Nothing is sent automatically.</p><RecordForm fields={[{key:'name',label:'Name',required:true},{key:'body',label:'Reply text',type:'textarea',required:true}]} endpoint="/api/v1/canned-replies" redirectBase="/dashboard/canned-replies"/>{error?<p role="alert">Templates unavailable. Apply migration 00023.</p>:data?.map(t=><article key={t.id} className="rounded border border-border p-4"><h2 className="font-semibold">{t.name}</h2><p className="whitespace-pre-wrap text-sm">{t.body}</p></article>)}</main>;}
+import { getWorkspace } from "@/lib/workspace";
+import { RecordForm } from "@/components/product/record-form";
+export default async function Canned() {
+  const { supabase, workspace } = await getWorkspace();
+  const { data, error } = await supabase
+    .from("canned_replies")
+    .select()
+    .eq("workspace_id", workspace.id)
+    .order("name")
+    .limit(200);
+  return (
+    <main className="space-y-4 overflow-auto p-6">
+      <h1 className="text-2xl font-semibold">Canned replies</h1>
+      <p className="text-sm text-muted-foreground">
+        Workspace templates inserted into the composer for review. Nothing is
+        sent automatically.
+      </p>
+      <RecordForm
+        fields={[
+          { key: "name", label: "Name", required: true },
+          {
+            key: "body",
+            label: "Reply text",
+            type: "textarea",
+            required: true,
+          },
+        ]}
+        endpoint="/api/v1/canned-replies"
+        redirectBase="/dashboard/canned-replies"
+      />
+      {error ? (
+        <p role="alert">Templates unavailable. Apply migration 00023.</p>
+      ) : (
+        data?.map((t) => (
+          <article key={t.id} className="rounded border border-border p-4">
+            <h2 className="font-semibold">{t.name}</h2>
+            <p className="whitespace-pre-wrap text-sm">{t.body}</p>
+          </article>
+        ))
+      )}
+    </main>
+  );
+}

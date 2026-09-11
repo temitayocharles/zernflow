@@ -2,16 +2,16 @@
 ## Repository State
 - Working branch: `arena/01a091fb-zernflow` (Arena session branch constraint)
 - Base branch: `main`
-- Current remote HEAD: `88d647bef3754c4af102bbd8739b57aca3053eab` (verified 2026-09-11)
+- Current remote main HEAD: `88d647bef3754c4af102bbd8739b57aca3053eab`; continuation includes pushed CRM/work/collaboration/integration/analytics slices (see branch history).
 - Active PR: https://github.com/temitayocharles/zernflow/pull/11
-- Last successful validation: Node 24.21.0/npm 11.19.1; lint (44 warnings, zero errors), typecheck, 165 tests / 21 files, production build; production audit zero vulnerabilities.
+- Last successful validation: Node 24/npm 11 production build, typecheck, 241 tests / 35 files; full SQL history 00001–00026 executed in PostgreSQL fixture; lint 44 baseline warnings.
 - Last updated: 2026-09-11
 ## Completed
 - [x] Fetched remote heads; no prior completion branch or ledger exists.
 - [x] Inspected local source-of-truth, isolation, README, CI, scripts, Gateway contracts and channel projection/onboarding implementation.
 - [x] Installed locked npm dependencies and established baseline.
 ## In Progress
-- [ ] Overall program is partial. CRM/work-item persistence, collaboration UI/API, email, publishing, analytics, knowledge, notifications and live acceptance are not complete.
+- [ ] Overall program remains in progress. CRM/work persistence and operator views now implemented; collaboration execution uses existing seams; email/publishing live adapters and approval/policy execution still require verified external contracts. Do not describe the whole mandate as certified.
 - [x] CODE COMPLETE / LOCAL VALIDATION COMPLETE: connector registry, fail-closed OAuth/capability resolution, Gateway-managed Telegram setup guidance, owner-only channel UI controls. No new Gateway endpoints assumed.
 ## Next
 - [ ] Verify Gateway canonical docs and deployed contracts before expanding integration APIs.
@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Harden remaining product boundaries: preserve reference selections beyond selector limits, enforce customer-profile identity in the database, add scoped team directory for assignment/mentions, verify API conflicts and tenant checks, then complete responsive navigation and run the full validation loop.
+Add automated browser/component tests for new product form error/conflict flows and inbox pagination/selection races using test fixtures only. Finish remaining repository-side UX gaps (canned-reply editing, queue editing, full source/config pagination and safe bulk work updates) before live acceptance. External adapter enablement remains separate in the handoff.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -114,3 +114,11 @@ Harden remaining product boundaries: preserve reference selections beyond select
 - Added operator analytics screen and manual SLA review for the recipient's oldest 500 assigned open items. Warning/breach notifications use stable per-objective dedupe keys; limits and lack of background scheduling are explicit in UI.
 - Test fixture now applies the **entire migration history 00001–00025** in lexical order using PGlite PostgreSQL, with minimal Supabase Auth roles/schema/publication fixture and uuid-ossp equivalent. This is schema/RLS validation, not live Supabase certification.
 - LOCAL VALIDATION: typecheck, tests and production build pass; 228 tests across 32 files, lint 44 baseline warnings.
+
+
+## Product integrity, directory and responsive navigation
+- Migration 00026 makes customer-profile contact identity immutable, provides a membership-authorized teammate directory exposing only ID/display name/role, and clears assignee/owner references safely when members leave.
+- Assignment/ownership/mentions now use actual teammate selectors instead of requiring UUID entry. Existing references outside selector page limits remain selected rather than being accidentally cleared on save.
+- Mobile navigation uses native modal-dialog focus handling; desktop navigation remains persistent and independently scrollable. CRM/contact custom-field query corrected to use actual `type` column.
+- Hardened browser session expiry, notification internal links and metrics shape validation. Added CRM API tests for selected-workspace filters, auth, forged tenant fields and optimistic conflicts; added recipient isolation/profile identity/directory SQL cases.
+- Formatted all new product modules for reviewability. Full test suite: 241 / 35 files; production build and typecheck pass. Entire SQL history through 00026 passes actual PostgreSQL fixture execution.

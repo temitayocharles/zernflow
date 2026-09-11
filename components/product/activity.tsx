@@ -1,10 +1,124 @@
 "use client";
-import {useEffect,useState} from 'react';
-import type {CustomerNote,ProductActivity} from '@/lib/product/types';
-export function Activity({kind,id}:{kind:string;id:string}){
- const [data,setData]=useState<{notes:CustomerNote[];activity:ProductActivity[]}>({notes:[],activity:[]});const [error,setError]=useState<string|null>(null);const [busy,setBusy]=useState(false);const [revision,setRevision]=useState(0);const [loading,setLoading]=useState(true);
- const endpoint=`/api/v1/product/activity?${new URLSearchParams({kind,id})}`;
- useEffect(()=>{const controller=new AbortController();setLoading(true);fetch(endpoint,{signal:controller.signal}).then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error);if(!controller.signal.aborted){setData(data);setError(null);}}).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return()=>controller.abort();},[endpoint,revision]);
- async function add(event:React.FormEvent<HTMLFormElement>){event.preventDefault();const form=event.currentTarget;setBusy(true);try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:new FormData(form).get('body'),mention_ids:String(new FormData(form).get('mentions')??'').split(',').map(v=>v.trim()).filter(Boolean)})});const data=await response.json();if(!response.ok)throw new Error(data.error);form.reset();setRevision(v=>v+1);}catch(e){setError(e instanceof Error?e.message:'Unable to add note');}finally{setBusy(false);}}
- return <section className="space-y-4 rounded-xl border border-border p-4"><h2 className="font-semibold">Internal notes & activity</h2><form onSubmit={add}><label className="text-sm">Internal note (never sent to the customer)<textarea name="body" required maxLength={10000} className="mt-2 w-full rounded-lg border border-border bg-background p-3"/></label><label className="block text-sm">Mention workspace member IDs (comma-separated, up to 20)<input name="mentions" className="my-2 w-full rounded border border-border bg-background p-2"/></label><button disabled={busy} className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50">{busy?'Adding…':'Add note'}</button></form>{error&&<p role="alert" className="text-sm text-destructive">{error} <button onClick={()=>setRevision(v=>v+1)} className="underline">Retry</button></p>}{loading?<p role="status">Loading activity…</p>:<><p className="text-xs text-muted-foreground">Most recent 100 notes and 100 changes. Actor IDs are recorded by the database.</p>{data.notes.map(note=><article key={note.id} className="border-t border-border pt-3"><p className="whitespace-pre-wrap text-sm">{note.body}</p><p className="mt-1 text-xs text-muted-foreground">{new Date(note.created_at).toLocaleString()} · {note.author_id}</p></article>)}{data.activity.map(a=><details key={a.id} className="text-sm"><summary>{a.action} · {new Date(a.created_at).toLocaleString()} · {a.actor_id??'System'}</summary><pre className="overflow-auto text-xs">{JSON.stringify(a.changes,null,2)}</pre></details>)}{!data.notes.length&&!data.activity.length&&<p className="text-sm text-muted-foreground">No activity yet.</p>}</>}</section>;
+import { MemberMentions } from "./member-mentions";
+import { useEffect, useState } from "react";
+import type { CustomerNote, ProductActivity } from "@/lib/product/types";
+export function Activity({ kind, id }: { kind: string; id: string }) {
+  const [data, setData] = useState<{
+    notes: CustomerNote[];
+    activity: ProductActivity[];
+  }>({ notes: [], activity: [] });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const endpoint = `/api/v1/product/activity?${new URLSearchParams({ kind, id })}`;
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    fetch(endpoint, { signal: controller.signal })
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error);
+        if (!controller.signal.aborted) {
+          setData(data);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [endpoint, revision]);
+  async function add(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setBusy(true);
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: new FormData(form).get("body"),
+          mention_ids: new FormData(form).getAll("mentions"),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      form.reset();
+      setRevision((v) => v + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to add note");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="space-y-4 rounded-xl border border-border p-4">
+      <h2 className="font-semibold">Internal notes & activity</h2>
+      <form onSubmit={add}>
+        <label className="text-sm">
+          Internal note (never sent to the customer)
+          <textarea
+            name="body"
+            required
+            maxLength={10000}
+            className="mt-2 w-full rounded-lg border border-border bg-background p-3"
+          />
+        </label>
+        <MemberMentions />
+        <button
+          disabled={busy}
+          className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50"
+        >
+          {busy ? "Adding…" : "Add note"}
+        </button>
+      </form>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}{" "}
+          <button
+            onClick={() => setRevision((v) => v + 1)}
+            className="underline"
+          >
+            Retry
+          </button>
+        </p>
+      )}
+      {loading ? (
+        <p role="status">Loading activity…</p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Most recent 100 notes and 100 changes. Actor IDs are recorded by the
+            database.
+          </p>
+          {data.notes.map((note) => (
+            <article key={note.id} className="border-t border-border pt-3">
+              <p className="whitespace-pre-wrap text-sm">{note.body}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {new Date(note.created_at).toLocaleString()} · {note.author_id}
+              </p>
+            </article>
+          ))}
+          {data.activity.map((a) => (
+            <details key={a.id} className="text-sm">
+              <summary>
+                {a.action} · {new Date(a.created_at).toLocaleString()} ·{" "}
+                {a.actor_id ?? "System"}
+              </summary>
+              <pre className="overflow-auto text-xs">
+                {JSON.stringify(a.changes, null, 2)}
+              </pre>
+            </details>
+          ))}
+          {!data.notes.length && !data.activity.length && (
+            <p className="text-sm text-muted-foreground">No activity yet.</p>
+          )}
+        </>
+      )}
+    </section>
+  );
 }
