@@ -18,33 +18,12 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PlatformIcon } from "@/components/platform-icon";
 import type { Database, Platform } from "@/lib/types/database";
 
+import { CONNECTORS, getConnector } from "@/lib/connectors/registry";
+
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 
-const platformLabels: Record<Platform, string> = {
-  facebook: "Facebook",
-  instagram: "Instagram",
-  twitter: "X / Twitter",
-  telegram: "Telegram",
-  bluesky: "Bluesky",
-  reddit: "Reddit",
-  whatsapp: "WhatsApp",
-};
-
-const connectablePlatforms: { id: Platform; label: string }[] = [
-  { id: "instagram", label: "Instagram" },
-  { id: "facebook", label: "Facebook" },
-  { id: "twitter", label: "X / Twitter" },
-  { id: "telegram", label: "Telegram" },
-  { id: "bluesky", label: "Bluesky" },
-  { id: "reddit", label: "Reddit" },
-  { id: "whatsapp", label: "WhatsApp" },
-];
-
 function getPlatformLabel(platform: string): string {
-  return (
-    platformLabels[platform as Platform] ||
-    platform.charAt(0).toUpperCase() + platform.slice(1)
-  );
+  return getConnector(platform)?.label ?? platform;
 }
 
 function getDmLink(platform: Platform, username: string | null): { url: string | null; label: string } {
@@ -70,15 +49,19 @@ function getDmLink(platform: Platform, username: string | null): { url: string |
 export function ChannelsView({
   channels: initialChannels,
   onboardingPlatforms,
+  canManage,
+  readinessUnavailable,
 }: {
   channels: Channel[];
   workspaceId: string;
   onboardingPlatforms: Platform[];
+  canManage: boolean;
+  readinessUnavailable: boolean;
 }) {
-  const availableConnectablePlatforms = connectablePlatforms.filter((platform) =>
+  const availableConnectablePlatforms = CONNECTORS.filter((platform) =>
     onboardingPlatforms.includes(platform.id),
   );
-  const providerOnboardingEnabled = availableConnectablePlatforms.length > 0;
+  const providerOnboardingEnabled = canManage && availableConnectablePlatforms.length > 0;
   const [channels, setChannels] = useState(initialChannels);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -104,7 +87,7 @@ export function ChannelsView({
   }, [showPlatformPicker]);
 
   async function handleConnect(platform: Platform) {
-    if (!providerOnboardingEnabled) {
+    if (!providerOnboardingEnabled || !onboardingPlatforms.includes(platform)) {
       setSyncMessage(
         "New channel connections require a configured Gateway provider application.",
       );
@@ -125,9 +108,11 @@ export function ChannelsView({
         return;
       }
 
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
+      if (typeof data.authUrl !== "string" || !data.authUrl) {
+        setSyncMessage("Gateway did not return a connection URL. Please retry.");
+        return;
       }
+      window.location.href = data.authUrl;
     } catch {
       setSyncMessage("Failed to start connection");
       setTimeout(() => setSyncMessage(null), 4000);
@@ -178,7 +163,9 @@ export function ChannelsView({
       .update({ is_active: !channel.is_active })
       .eq("id", channel.id);
 
-    if (!error) {
+    if (error) {
+      setSyncMessage("Unable to update channel. Workspace owner access is required.");
+    } else {
       setChannels((prev) =>
         prev.map((c) =>
           c.id === channel.id ? { ...c, is_active: !c.is_active } : c
@@ -227,13 +214,13 @@ export function ChannelsView({
           </div>
           <div className="flex items-center gap-3">
             {syncMessage && (
-              <span className="text-xs text-muted-foreground">
+              <span role="status" className="text-xs text-muted-foreground">
                 {syncMessage}
               </span>
             )}
             <button
               onClick={handleSync}
-              disabled={syncing}
+              disabled={syncing || !canManage}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
             >
               <RefreshCw
@@ -285,6 +272,21 @@ export function ChannelsView({
           Existing Gateway accounts can still be imported with <strong>Sync</strong>.
         </div>
       )}
+
+      <section aria-label="Connector setup" className="border-b border-border px-8 py-4">
+        <h2 className="text-sm font-semibold">Connector setup</h2>
+        {readinessUnavailable && <p role="status" className="mt-2 text-sm text-muted-foreground">Gateway readiness is unavailable. Existing records below are local projections, not a live health check.</p>}
+        {!canManage && <p className="mt-2 text-sm text-muted-foreground">Only workspace owners can connect, sync or change channels.</p>}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {CONNECTORS.map((connector) => (
+            <div key={connector.id} className="rounded-lg border border-border p-3">
+              <p className="text-sm font-medium">{connector.label}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{onboardingPlatforms.includes(connector.id) ? "Available to connect" : connector.onboarding === "gateway_managed" ? "Gateway setup required" : "Onboarding unavailable"}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{connector.setupHelp}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Channel cards */}
       <div className="flex-1 overflow-auto p-8">
@@ -365,7 +367,7 @@ export function ChannelsView({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleToggleActive(channel)}
-                        disabled={togglingId === channel.id}
+                        disabled={!canManage || togglingId === channel.id}
                         className={cn(
                           "rounded-lg p-2 transition-colors",
                           channel.is_active
@@ -386,7 +388,7 @@ export function ChannelsView({
                       </button>
                       <button
                         onClick={() => setChannelToDelete(channel)}
-                        disabled={deletingId === channel.id}
+                        disabled={!canManage || deletingId === channel.id}
                         className="rounded-lg p-2 text-muted-foreground hover:bg-red-100 hover:text-red-600 transition-colors"
                         title="Delete channel"
                       >

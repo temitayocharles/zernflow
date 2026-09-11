@@ -3,7 +3,7 @@
 - Working branch: `arena/01a091fb-zernflow` (Arena session branch constraint)
 - Base branch: `main`
 - Current remote HEAD: `88d647bef3754c4af102bbd8739b57aca3053eab` (verified 2026-09-11)
-- Active PR: pending creation
+- Active PR: https://github.com/temitayocharles/zernflow/pull/11
 - Last successful validation: baseline lint (45 warnings, zero errors), typecheck, 88 tests / 15 files
 - Last updated: 2026-09-11
 ## Completed
@@ -11,7 +11,7 @@
 - [x] Inspected local source-of-truth, isolation, README, CI, scripts, Gateway contracts and channel projection/onboarding implementation.
 - [x] Installed locked npm dependencies and established baseline.
 ## In Progress
-- [ ] Centralize existing connector definitions and expose honest runtime onboarding states.
+- [x] CODE COMPLETE / LOCAL VALIDATION COMPLETE: connector registry, fail-closed OAuth/capability resolution, Gateway-managed Telegram setup guidance, owner-only channel UI controls. No new Gateway endpoints assumed.
 ## Next
 - [ ] Verify Gateway canonical docs and deployed contracts before expanding integration APIs.
 - [ ] Audit collaboration and inbox gaps, then implement missing tenant-scoped product entities in dependency order.
@@ -39,4 +39,10 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Create `lib/connectors/registry.ts` to centralize existing projection platforms and supported onboarding contracts; wire channel UI and sync platform validation to it with fail-closed readiness tests. Do not advertise Telegram token onboarding until its Gateway contract is verified.
+Remove build-time external font retrieval while preserving Inter, and replace unsafe smoke defaults with explicit disposable target configuration and testable guards. Then inspect collaboration/inbox implementation before choosing the next product slice.
+
+### Connector slice validation
+- `npm run typecheck`: passed.
+- `npm test`: 97 passed / 16 files, including 9 registry cases and existing Meta route tests.
+- `npm run lint`: zero errors, unchanged 45 warnings.
+- No migration or new provider/backend endpoint. Runtime provider support remains uncertified.
