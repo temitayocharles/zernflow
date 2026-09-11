@@ -1,0 +1,60 @@
+"use client";
+import { useState } from "react";
+export function CannedPicker({
+  onInsert,
+}: {
+  onInsert: (text: string) => void;
+}) {
+  const [items, setItems] = useState<
+    { id: string; name: string; body: string }[]
+  >([]);
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
+  async function load() {
+    setLoading(true);
+    setStatus("");
+    try {
+      const r = await fetch("/api/v1/canned-replies");
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      setItems(data.items);
+      if (!data.items.length)
+        setStatus("No saved replies. Add one from Canned replies.");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Unable to load replies");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <div className="mb-2 flex flex-wrap gap-2 text-xs">
+      <button
+        type="button"
+        onClick={load}
+        disabled={loading}
+        className="underline"
+      >
+        {loading ? "Loading…" : "Load canned replies"}
+      </button>
+      {items.length > 0 && (
+        <select
+          aria-label="Insert a canned reply"
+          value=""
+          onChange={(e) => {
+            const reply = items.find((i) => i.id === e.target.value);
+            if (reply) onInsert(reply.body);
+          }}
+          className="rounded border border-border bg-background"
+        >
+          <option value="">Insert reply for review</option>
+          {items.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {status && <span role="status">{status}</span>}
+    </div>
+  );
+}
