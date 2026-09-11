@@ -50,7 +50,7 @@ The continuation branch adds tenant-isolated CRM companies/profiles/opportunitie
 reusable work items and queues with SLA presentation, internal notes/mentions,
 recipient notifications, canned replies, editorial planning, mailbox identity
 configuration, external knowledge retrieval, and operator analytics. Apply
-migrations **00021–00027** for these surfaces. See
+migrations **00021–00029** for these surfaces. See
 `docs/PRODUCT_INTEGRATION_SEAMS.md` for explicit provider/runtime boundaries and
 `docs/LM_ARENA_EXECUTION_LEDGER.md` for implementation/validation evidence.
 Editorial approval does not publish content; mailbox configuration does not
@@ -115,7 +115,7 @@ Never prefix gateway credentials, the service-role key, cron secret or webhook s
 
 ## Database migrations
 
-The numbered files in `supabase/migrations/` are the only migration source of truth. Apply every numbered migration in lexical order, currently `00001` through `00027`.
+The numbered files in `supabase/migrations/` are the only migration source of truth. Apply every numbered migration in lexical order, currently `00001` through `00029`.
 
 For a linked Supabase project, use the Supabase CLI migration workflow. For a manual installation, execute each numbered SQL file in order and record the applied revision outside the application database if your deployment system does not do so automatically.
 
@@ -164,7 +164,7 @@ GET /api/cron/jobs
 GET /api/cron/sequences
 ```
 
-Use a cadence appropriate to the deployment platform. The job route performs claim compare-and-swap, stale-claim recovery, bounded retries and terminal settlement for delayed flows, broadcasts and queued gateway events.
+Use a cadence appropriate to the deployment platform. The job route performs claim compare-and-swap, stale-claim recovery, bounded retries and terminal settlement for delayed flows, broadcasts and queued gateway events. With migrations 00028–00029 it also performs bounded, deduplicated SLA notification scans; inspect the `slaNotifications` result for failures or more pending batches.
 
 ## Security model
 

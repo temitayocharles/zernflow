@@ -8,7 +8,7 @@ const user = "20000000-0000-4000-8000-000000000001";
 const company = "30000000-0000-4000-8000-000000000001";
 beforeAll(async () => {
   await db.exec(
-    `create publication supabase_realtime; create schema auth; create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb); create role authenticated; create role service_role; create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; create function uuid_generate_v4() returns uuid language sql as $$ select gen_random_uuid() $$;`,
+    `create publication supabase_realtime; create schema auth; create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb); create role authenticated; create role service_role; create role anon; alter default privileges in schema public grant execute on functions to authenticated,anon; create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; create function uuid_generate_v4() returns uuid language sql as $$ select gen_random_uuid() $$;`,
   );
   await db.exec(
     readFileSync(
@@ -373,5 +373,103 @@ describe("Atomic bulk work changes", () => {
         JSON.stringify([{ id: company, version: 1, status: "open" }]),
       ]),
     ).rejects.toThrow();
+  });
+});
+
+describe("Editorial variant approval boundary", () => {
+  it("invalidates prior approval atomically when a channel variant changes", async () => {
+    const channel = "60000000-0000-4000-8000-000000000001";
+    await db.exec(
+      `insert into channels(id,workspace_id,platform,late_account_id) values('${channel}','${ws}','telegram','test-account')`,
+    );
+    const { rows } = await db.query<{ id: string }>(
+      `insert into editorial_drafts(workspace_id,name,body) values('${ws}','Variant draft','Base') returning id`,
+    );
+    const id = rows[0].id;
+    await db.exec(
+      `update editorial_drafts set state='in_review' where id='${id}';update editorial_drafts set state='approved' where id='${id}';insert into editorial_variants(workspace_id,draft_id,channel_id,body) values('${ws}','${id}','${channel}','Variant')`,
+    );
+    expect(
+      (
+        await db.query<{ state: string; reviewed_by: null }>(
+          `select state,reviewed_by from editorial_drafts where id='${id}'`,
+        )
+      ).rows[0],
+    ).toEqual({ state: "draft", reviewed_by: null });
+  });
+  it("denies nonowner approval and cross-workspace channel variants", async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into editorial_drafts(workspace_id,name) values('${ws}','Review') returning id`,
+    );
+    const id = rows[0].id;
+    await db.exec(
+      `update editorial_drafts set state='in_review' where id='${id}';reset role;update workspace_members set role='member' where workspace_id='${ws}' and user_id='${user}';set role authenticated;`,
+    );
+    await expect(
+      db.exec(`update editorial_drafts set state='approved' where id='${id}'`),
+    ).rejects.toThrow();
+    await db.exec(
+      `reset role;update workspace_members set role='owner' where workspace_id='${ws}' and user_id='${user}';insert into channels(id,workspace_id,platform,late_account_id) values('60000000-0000-4000-8000-000000000002','${other}','telegram','foreign');set role authenticated;`,
+    );
+    await expect(
+      db.exec(
+        `insert into editorial_variants(workspace_id,draft_id,channel_id,body) values('${ws}','${id}','60000000-0000-4000-8000-000000000002','No')`,
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+describe("Scheduled SLA notifications", () => {
+  it("denies cross-workspace scheduled scans to ordinary members", async () => {
+    await expect(
+      db.exec("select refresh_sla_notifications()"),
+    ).rejects.toThrow();
+  });
+  it("creates deduplicated signals through service-only scheduled function", async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into work_items(workspace_id,name,assignee_id,first_response_minutes,resolution_minutes) values('${ws}','Scheduled SLA','${user}',1,2) returning id`,
+    );
+    await db.exec("reset role");
+    const first = await db.query<{ inserted: number }>(
+      `select refresh_sla_notifications(now()+interval '3 minutes') as inserted`,
+    );
+    expect(first.rows[0].inserted).toBeGreaterThanOrEqual(2);
+    const second = await db.query<{ inserted: number }>(
+      `select refresh_sla_notifications(now()+interval '3 minutes') as inserted`,
+    );
+    expect(second.rows[0].inserted).toBe(0);
+    const notes = await db.query<{ kind: string }>(
+      `select kind from operator_notifications where entity_id='${rows[0].id}' and kind like 'sla_%'`,
+    );
+    expect(notes.rows).toHaveLength(2);
+    expect(notes.rows.every((n) => n.kind === "sla_breached")).toBe(true);
+    await db.exec("set role authenticated");
+  });
+});
+
+describe("Explicit privileged RPC grants", () => {
+  it("revokes Supabase default client grants while retaining worker grants", async () => {
+    for (const signature of [
+      "increment_unread(uuid,text)",
+      "increment_broadcast_sent(uuid)",
+      "increment_broadcast_failed(uuid)",
+      "claim_social_gateway_webhook(text,text,text,uuid,jsonb)",
+      "apply_social_gateway_inbound_conversation(uuid,timestamptz,text,text)",
+      "refresh_sla_notifications(timestamptz)",
+    ]) {
+      const result = await db.query<{
+        anonymous: boolean;
+        member: boolean;
+        worker: boolean;
+      }>(
+        `select has_function_privilege('anon',$1,'execute') as anonymous,has_function_privilege('authenticated',$1,'execute') as member,has_function_privilege('service_role',$1,'execute') as worker`,
+        [signature],
+      );
+      expect(result.rows[0]).toEqual({
+        anonymous: false,
+        member: false,
+        worker: true,
+      });
+    }
   });
 });

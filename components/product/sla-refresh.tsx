@@ -34,7 +34,7 @@ export function SlaRefresh() {
       </button>
       <p role="status" className="mt-2 text-xs text-muted-foreground">
         {message ||
-          "Manual review of up to 500 oldest assigned open items; not a background alert scheduler."}
+          "Manual review of up to 500 oldest assigned open items. Background review runs through the existing jobs cron when migration 00028 and the deployment cron are active."}
       </p>
     </div>
   );

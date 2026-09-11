@@ -263,3 +263,27 @@ Only authorized, confirmed Gateway decisions update displayed policy/request sta
 Decisions on unknown tenant requests, UI transitions after failed writes, or an unknown policy displayed as applied Allow/Ask.
 ### Rollback consideration
 Remove adapter callbacks to return components to explicit unavailable/read-only states; do not undo already executed Gateway operations automatically.
+
+## ITEM: Scheduled SLA and RPC grant rollout (supersedes manual-only SLA handoff)
+### Code status
+COMPLETE
+### Repository evidence
+Commit: scheduled-SLA/RPC hardening slice on PR #11.
+Files: migrations 00028–00029, `app/api/cron/jobs/route.ts`, cron route tests and full-history PostgreSQL tests.
+Tests: bounded service-only SQL scan, dedupe, browser-role execution denial despite default grants, cron authorization/failure handling.
+### External system
+Supabase / existing Northflank scheduler
+### Exact action required
+Apply 00028 then 00029. Keep the existing `/api/cron/jobs` scheduler active using the Authorization header. No new scheduler platform is required. Verify signed webhook/cron workers retain service-role RPC access after grant hardening.
+### Environment variables / secret names
+CRON_SECRET, SUPABASE_SERVICE_ROLE_KEY; existing Supabase runtime variables.
+### Endpoint or callback expected
+GET `/api/cron/jobs` with `Authorization: Bearer <CRON_SECRET>`; response includes `slaNotifications` status/inserted/mayHaveMore. Do not place the secret in logs or public URLs.
+### Verification procedure
+Create due assigned work, invoke cron twice, confirm one signal per item/objective/severity/recipient. Scan batches over 1000 should progress on subsequent invocations. Verify authenticated/anon cannot execute worker-only RPCs and signed worker paths still function. Confirm Gateway processing events survive legacy pruning.
+### Expected success result
+Timed notifications through the existing runner, safe retries, explicit degraded scan results, and no browser access to privileged worker mutations.
+### Failure symptoms
+Missing RPC migration (503), worker permission denial, duplicate signals, stalled batches or browser RPC execution still granted.
+### Rollback consideration
+Do not restore broad browser grants as rollback. Pause the scheduler/UI if necessary, retain records and fix service-role deployment configuration. Already-completed jobs must not be manually reset merely because a later SLA scan failed.

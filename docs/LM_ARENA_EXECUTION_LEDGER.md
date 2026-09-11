@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Run repository-wide security/validation review, verify the pushed branch and PR evidence, and close remaining safe product defects discovered by source/DOM/SQL tests. Start with foreign-reference audit-invalidation tests for editorial variants and API authorization tests for knowledge source selection; do not enable unverifiable external execution contracts.
+Run Node 24/npm 11 clean install, lint, typecheck, complete DOM/unit/PostgreSQL tests and production build against migrations 00001–00029; update PR #11 and rollout documentation. If any validation fails, fix that exact regression first. External adapters remain disabled until the handoff contracts are verified.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -134,3 +134,10 @@ Run repository-wide security/validation review, verify the pushed branch and PR 
 - Six new React DOM cases verify unknown policy is not presented as an applied default, degraded queues cannot approve, failed decisions retain pending state, and only confirmed matching decisions transition UI.
 - New product JSON APIs now bound request bodies to 256 KiB before parsing. Parser/unexpected errors do not echo payloads or upstream secrets. Activity entity allowlist excludes inherited object properties.
 - LOCAL VALIDATION: 266 tests / 41 files, typecheck, lint (44 baseline warnings), Node 24 production build pass.
+
+## Scheduled SLA delivery and privileged RPC hardening
+- Migration 00028 connects deduplicated SLA warnings/breaches to the **existing protected jobs cron**, rather than leaving repository-side scheduling code for an integration engineer. Each scan inserts at most 1000 previously unnotified signals; later invocations progress through the remainder. Advisory lock and unique keys make retries/concurrent scans safe. Manual review remains available.
+- Cron now reports SLA scan failure explicitly with a retriable 503 while retaining truthful already-processed job counts. Legacy webhook pruning is restricted to completed Zernio events, never durable Gateway processing/failed records.
+- Migration 00029 fixes a privileged RPC grant boundary: Supabase default privileges can grant authenticated/anon EXECUTE independently of PUBLIC. Worker-only unread/counter, Gateway claim/projection and SLA scan functions now explicitly revoke those grants and retain service_role access. Legacy security-definer search paths hardened.
+- SQL test fixture now models explicit default client function grants and verifies worker-only RPC privileges. Additional tests verify cron auth/failure/no-job behavior, scheduled signal deduplication, knowledge source authorization and editorial variant approval invalidation/foreign references.
+- Local targeted SQL/route tests pass; complete validation is rerun after this slice.

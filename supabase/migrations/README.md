@@ -7,7 +7,7 @@ Current required range:
 ```text
 00001_initial_schema.sql
 ...
-00027_atomic_work_updates.sql
+00029_privileged_rpc_grants.sql
 ```
 
 Do not concatenate the files into an aggregate SQL script and do not selectively copy statements between migrations. Later migrations intentionally alter constraints, policies, indexes and security-definer functions established by earlier files.
@@ -23,7 +23,7 @@ supabase db push
 supabase migration list
 ```
 
-The second `migration list` must show migrations `00001` through `00027` as applied to the remote project.
+The second `migration list` must show migrations `00001` through `00029` as applied to the remote project.
 
 For a disposable local Supabase environment, rebuild from the complete numbered history:
 
@@ -112,7 +112,7 @@ Workspace updates and channel inserts, updates and deletes must be owner-scoped.
 A ZernFlow release that includes gateway-backed inbox, sequences, broadcasts or signed gateway webhooks is not production-ready unless the target database has applied migrations `00016` through `00020` in addition to the earlier schema history.
 
 
-## Product-domain migrations 00021–00027
+## Product-domain migrations 00021–00029
 
 - 00021: companies, customer profiles, opportunities, internal notes, audit.
 - 00022: reusable work items, queues, SLA snapshots and guarded transitions.
@@ -151,3 +151,16 @@ No automatic down migration is provided: retain customer/work records when
 rolling back application code, rather than destructively dropping tables.
 
 - 00027: atomic membership-scoped, version-safe bulk work status/priority updates; no partial writes on conflict.
+
+- 00028: service-only bounded SLA notification scan, reused by the existing jobs cron.
+- 00029: explicit browser-role revocation for worker-only RPCs, including explicit
+  Supabase default grants, while retaining service_role execution. Never roll back
+  by restoring anon/authenticated access to privileged mutation functions.
+
+Privilege verification (all client checks must be false, worker true):
+
+```sql
+select has_function_privilege('authenticated','public.refresh_sla_notifications(timestamptz)','EXECUTE') as client_allowed,
+       has_function_privilege('anon','public.claim_social_gateway_webhook(text,text,text,uuid,jsonb)','EXECUTE') as anon_allowed,
+       has_function_privilege('service_role','public.refresh_sla_notifications(timestamptz)','EXECUTE') as worker_allowed;
+```

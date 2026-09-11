@@ -60,10 +60,12 @@ export async function GET(request: NextRequest) {
   const supabase = await createServiceClient();
 
   // Prune the webhook idempotency ledger; ids only matter for Zernio's retry
-  // window (hours), so anything older than 48h is dead weight.
+  // window (hours). Never prune durable Gateway processing/failed records.
   await supabase
     .from("webhook_events")
     .delete()
+    .eq("source", "zernio")
+    .eq("status", "completed")
     .lt("received_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString());
 
   // Pick up pending jobs that are due, plus 'processing' jobs whose claim is
@@ -227,7 +229,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed, failed, total: jobs.length });
+  const sla = await supabase.rpc("refresh_sla_notifications", {});
+  // Existing job outcomes remain accurate even if the separately retryable SLA
+  // scan fails. Surface the degraded scan explicitly, without logging secrets.
+  return NextResponse.json({ processed, failed, total: jobs.length,
+    slaNotifications: sla.error
+      ? { status: "failed", error: "SLA scan unavailable; verify migration 00028 and retry the cron invocation" }
+      : { status: "completed", inserted: sla.data, mayHaveMore: (sla.data ?? 0) >= 1000 },
+  }, { status: sla.error ? 503 : 200 });
 }
 
 // Marks a job out of retries as failed. A failed resume_flow job would leave

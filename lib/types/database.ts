@@ -1114,6 +1114,10 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
+      refresh_sla_notifications: {
+        Args: { p_as_of?: string };
+        Returns: number;
+      };
       bulk_update_work_items: {
         Args: { p_workspace_id: string; p_changes: Json };
         Returns: number;
