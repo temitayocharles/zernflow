@@ -1,15 +1,7 @@
 import type { GatewayAccount } from "./types";
 import type { Platform } from "@/lib/types/database";
 
-const SUPPORTED_PLATFORMS = new Set<Platform>([
-  "facebook",
-  "instagram",
-  "twitter",
-  "telegram",
-  "bluesky",
-  "reddit",
-  "whatsapp",
-]);
+import { isProjectionPlatform } from "@/lib/connectors/registry";
 
 export interface ExistingChannel {
   id: string;
@@ -52,7 +44,7 @@ export interface ChannelSyncPlan {
 }
 
 function asSupportedPlatform(value: string): Platform | null {
-  return SUPPORTED_PLATFORMS.has(value as Platform) ? (value as Platform) : null;
+  return isProjectionPlatform(value) ? value : null;
 }
 
 function displayName(account: GatewayAccount): string | null {
