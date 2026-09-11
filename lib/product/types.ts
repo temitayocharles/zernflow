@@ -5,10 +5,14 @@ export interface CustomerProfile extends ProductRecord { contact_id: string; com
 export interface Deal extends ProductRecord { name: string; description: string; company_id: string | null; contact_id: string | null; owner_id: string | null; stage: string; value_minor: number; currency: string; expected_close_at: string | null; closed_at: string | null }
 export interface WorkQueue extends ProductRecord { name:string;description:string }
 export interface WorkItem extends ProductRecord { reference:number;name:string;description:string;kind:string;status:string;priority:string;queue_id:string|null;assignee_id:string|null;contact_id:string|null;company_id:string|null;conversation_id:string|null;due_at:string|null;first_response_minutes:number;resolution_minutes:number;warning_fraction:number;first_responded_at:string|null;resolved_at:string|null;escalated:boolean;escalation_reason:string }
-export interface CustomerNote { work_item_id:string|null; id: string; workspace_id: string; company_id: string | null; contact_id: string | null; deal_id: string | null; body: string; author_id: string; created_at: string }
+export interface CannedReply extends ProductRecord {name:string;body:string}
+export interface OperatorNotification {id:string;workspace_id:string;recipient_id:string;title:string;kind:string;entity_type:string;entity_id:string;dedupe_key:string;created_at:string;read_at:string|null}
+export interface CustomerNote { conversation_id:string|null;mention_ids:string[]; work_item_id:string|null; id: string; workspace_id: string; company_id: string | null; contact_id: string | null; deal_id: string | null; body: string; author_id: string; created_at: string }
 export interface ProductActivity { id: string; workspace_id: string; entity_type: string; entity_id: string; actor_id: string | null; action: string; changes: Json; created_at: string }
 type Table<Row, Required extends keyof Row> = { Row: { [K in keyof Row]: Row[K] }; Insert: Pick<Row, Required> & Partial<Row>; Update: Partial<Row>; Relationships: [] };
 export type ProductTables = {
+  canned_replies:Table<CannedReply,"workspace_id"|"name"|"body">;
+  operator_notifications:Table<OperatorNotification,"workspace_id"|"recipient_id"|"title"|"kind"|"entity_type"|"entity_id"|"dedupe_key">;
   work_items: Table<WorkItem,"workspace_id"|"name">;
   work_queues: Table<WorkQueue,"workspace_id"|"name">;
   companies: Table<Company, "workspace_id" | "name">;

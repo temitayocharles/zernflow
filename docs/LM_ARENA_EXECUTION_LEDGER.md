@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Implement migration 00023 for member-scoped notifications and inbox internal notes/canned replies. Add permission-aware collaboration controls using the existing assignConversation/escalateConversation/setHumanTakeover client methods, keeping unverifiable approval-list and policy execution APIs explicitly unavailable.
+Implement provider-neutral email/message contracts, local publishing/editorial drafts, knowledge-source configuration and safe browser-session presentation seams without inventing external provider execution endpoints. Extend real-data workload/CRM analytics and SLA notifications using persisted work items.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -93,3 +93,10 @@ Implement migration 00023 for member-scoped notifications and inbox internal not
 - Conversation → work-item creation and reverse inbox deep links implemented. Contact Customer 360 now links profiles, companies, opportunities, work items and internal notes.
 - LOCAL VALIDATION: 189 tests / 24 files, build and typecheck pass; lint unchanged 44 warnings. PostgreSQL tests execute actual migration 00022 and verify immutable numbering/SLA, transitions, response preservation and cross-workspace references.
 - No background escalation is claimed: SLA breach is calculated and shown; notification scheduling remains the next product integration.
+
+## Collaboration, notes and notifications slice
+- CODE COMPLETE: permission-aware inbox assignment (self/unassigned/owner agent), escalation, human takeover and return-to-agent call existing verified Gateway client methods. Server derives operator attribution; local projected conversation is checked within selected workspace before any remote action. Owner required for admin takeover/agent controls. Confirmed changes are audited server-side; audit failure is explicitly distinguished from an already-applied remote action.
+- No fake control read/approval-list/policy endpoints: UI states exactly what is unavailable and describes Allow/Ask/Deny/Limit; typed approval projection and policy contracts exist. Existing Gateway approval execution methods are not exposed without a verified request-to-workspace read boundary.
+- Migration 00023 adds internal conversation notes, validated/deduplicated member mentions, canned replies, recipient-isolated notifications, and automatic assignment/escalation/status/mention notifications. Notifications permit only recipient read-state changes; note content never dispatches provider messages.
+- Inbox template insertion requires operator review. Notification and canned-reply management screens added.
+- LOCAL VALIDATION: domain/PostgreSQL suite passed (195 tests before six new collaboration route cases); six route authorization/attribution/failure tests pass; production build passes. Full suite follows in next slice.

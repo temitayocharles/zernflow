@@ -42,6 +42,8 @@ const navigation = [
   { name: "Flows", href: "/dashboard/flows", icon: GitBranch },
   { name: "Inbox", href: "/dashboard/inbox", icon: MessageSquare },
   { name: "Contacts", href: "/dashboard/contacts", icon: Users },
+  { name: "Notifications", href: "/dashboard/notifications", icon: MessageSquare },
+  { name: "Canned replies", href: "/dashboard/canned-replies", icon: MessageSquare },
   { name: "Work items", href: "/dashboard/work-items", icon: ListOrdered },
   { name: "CRM", href: "/dashboard/crm/companies", icon: Users },
   { name: "Broadcasts", href: "/dashboard/broadcasts", icon: Radio },

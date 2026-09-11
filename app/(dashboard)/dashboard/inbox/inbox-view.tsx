@@ -1,4 +1,6 @@
 "use client";
+import {CollaborationControls} from "@/components/product/collaboration-controls";
+import {Activity} from "@/components/product/activity";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageSquare, RefreshCw, User } from "lucide-react";
@@ -21,10 +23,12 @@ export function InboxView({
   conversations,
   workspaceId,
   initialConversationId,
+  isOwner,
 }: {
   conversations: Conversation[];
   workspaceId: string;
   initialConversationId?:string;
+  isOwner:boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Conversation | null>(conversations.find(c=>c.id===initialConversationId)??null);
@@ -155,7 +159,7 @@ export function InboxView({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        {selected && <div className="border-b border-border p-2"><CreateWorkItem conversationId={selected.id} contactId={selected.contact_id}/></div>}
+        {selected && <div className="border-b border-border p-2"><CreateWorkItem conversationId={selected.id} contactId={selected.contact_id}/><CollaborationControls key={selected.id} id={selected.id} isOwner={isOwner}/><details className="mt-2 text-xs"><summary>Internal notes & activity</summary><div className="max-h-72 overflow-auto"><Activity key={selected.id} kind="conversations" id={selected.id}/></div></details></div>}
         {selected && !showContactPanel && (
           <div className="flex shrink-0 justify-end border-b border-border px-2 py-1">
             <button

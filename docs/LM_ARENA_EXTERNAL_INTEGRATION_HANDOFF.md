@@ -119,3 +119,27 @@ Stable references and durable reusable work records; no duplicate provider ledge
 Missing relations, cross-tenant links, changed snapshots, stale overwrite, or invalid transitions accepted.
 ### Rollback consideration
 Keep persisted work data. Roll back application without dropping tables or resetting existing migrations.
+
+## ITEM: Collaboration and notifications acceptance
+### Code status
+PARTIAL
+### Repository evidence
+Commit: collaboration/notification continuation slice on PR #11.
+Files: migration 00023; `app/api/v1/conversations/[id]/control/route.ts`, `lib/collaboration/`, `components/product/collaboration-controls.tsx`, notifications/canned replies pages.
+Tests: PostgreSQL mention/notification guards; six collaboration route permission/attribution/failure cases.
+### External system
+Agent Social Gateway / Supabase / Northflank
+### Exact action required
+Apply 00023; verify existing assignment/escalation/admin takeover endpoints using authenticated operator actor refs `zernflow:user:<id>` and the existing configured Gateway workspace reference. Confirm that deployment credentials only reach permitted projected conversations. Supply verified workspace-scoped approval-list/request-read and policy-read/write contracts before enabling those controls; no speculative endpoints were implemented.
+### Environment variables / secret names
+SOCIAL_GATEWAY_BASE_URL, SOCIAL_GATEWAY_API_KEY, SOCIAL_GATEWAY_ADMIN_API_KEY, SOCIAL_GATEWAY_WORKSPACE_REF, SUPABASE_SERVICE_ROLE_KEY
+### Endpoint or callback expected
+Existing Gateway endpoints already implemented by `HttpSocialGatewayClient`; ZernFlow `/api/v1/conversations/<local-id>/control`.
+### Verification procedure
+Member can self-assign/escalate but cannot call owner-only takeover/agent assignment. Owner takeover/release must change the real Gateway state. Verify attributed local audit and explicit warning if only audit persistence fails. Add mention to another workspace member; verify only recipient sees notification and no provider message is sent.
+### Expected success result
+Real Gateway control changes with correct operator identity, tenant-safe notes/mentions and deduplicated recipient notifications.
+### Failure symptoms
+Remote actor rejected, cross-workspace controls accepted, forged audit, duplicate mentions, or local UI claiming an unconfirmed remote state.
+### Rollback consideration
+Do not blindly retry a control after an audit-only failure. Revert UI independently, preserve Gateway control state and database records.

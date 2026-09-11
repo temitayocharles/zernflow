@@ -11,6 +11,7 @@ beforeAll(async()=>{
   await db.exec(readFileSync('supabase/migrations/00002_rls_policies.sql','utf8'));
   await db.exec(readFileSync('supabase/migrations/00021_crm_foundations.sql','utf8'));
   await db.exec(readFileSync('supabase/migrations/00022_work_items.sql','utf8'));
+  await db.exec(readFileSync('supabase/migrations/00023_collaboration_notifications.sql','utf8'));
   await db.exec(`insert into auth.users values('${user}'); insert into workspaces(id,name,slug) values('${ws}','A','a'),('${other}','B','b'); insert into workspace_members(workspace_id,user_id) values('${ws}','${user}'); grant usage on schema public,auth to authenticated; grant select,insert,update,delete on all tables in schema public to authenticated; select set_config('request.jwt.claim.sub','${user}',false); set role authenticated;`);
 },30000);
 afterAll(async()=>{await db.close();});
@@ -70,5 +71,20 @@ describe('Work item persistence',()=>{
   const {rows}=await db.query<{id:string}>(`insert into work_items(workspace_id,name) values('${ws}','Note target') returning id`);
   await expect(db.exec(`update work_items set reference=999999 where id='${rows[0].id}'`)).rejects.toThrow();
   await db.exec(`insert into customer_notes(workspace_id,work_item_id,body) values('${ws}','${rows[0].id}','Ticket note')`);
+ });
+});
+
+describe('Operator notifications and mentions',()=>{
+ it('deduplicates mentions and rejects nonmembers',async()=>{
+  await db.exec(`insert into customer_notes(workspace_id,company_id,body,mention_ids) values('${ws}','${company}','Mention',array['${user}','${user}']::uuid[])`);
+  expect((await db.query(`select * from operator_notifications where kind='mention'`)).rows).toHaveLength(1);
+  await expect(db.exec(`insert into customer_notes(workspace_id,company_id,body,mention_ids) values('${ws}','${company}','No',array['20000000-0000-4000-8000-000000000099']::uuid[])`)).rejects.toThrow();
+ });
+ it('notifies assignment and blocks payload tampering',async()=>{
+  await db.exec(`insert into work_items(workspace_id,name,assignee_id) values('${ws}','Assigned','${user}')`);
+  const {rows}=await db.query<{id:string}>(`select id from operator_notifications where kind='assignment'`);expect(rows.length).toBeGreaterThan(0);
+  await expect(db.exec(`update operator_notifications set title='Forged' where id='${rows[0].id}'`)).rejects.toThrow();
+  await db.exec(`update operator_notifications set read_at=now() where id='${rows[0].id}'`);
+  await expect(db.exec(`insert into operator_notifications(workspace_id,recipient_id,title,kind,entity_type,entity_id,dedupe_key) values('${ws}','${user}','Fake','mention','companies','${company}','fake')`)).rejects.toThrow();
  });
 });

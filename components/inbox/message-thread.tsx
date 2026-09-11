@@ -1,5 +1,6 @@
 "use client";
 
+import {CannedPicker} from "@/components/product/canned-picker";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Send, Paperclip, Bot, User, MessageSquare, CheckCircle, Clock, RotateCcw, Loader2 } from "lucide-react";
@@ -398,6 +399,7 @@ export function MessageThread({
       <div className="border-t border-border p-4">
         <div className="mx-auto flex max-w-2xl items-end gap-2">
           <div className="flex-1">
+            <CannedPicker onInsert={text=>setInput(current=>current?`${current}\n${text}`:text)}/>
             <textarea
               ref={textareaRef}
               value={input}

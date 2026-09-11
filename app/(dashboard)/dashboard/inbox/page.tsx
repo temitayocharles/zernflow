@@ -3,7 +3,7 @@ import { InboxView } from "./inbox-view";
 
 export default async function InboxPage({searchParams}:{searchParams:Promise<{conversationId?:string}>}) {
   const requested=(await searchParams).conversationId;
-  const { workspace, supabase } = await getWorkspace();
+  const { workspace, supabase, role } = await getWorkspace();
 
   const { data: conversations } = await supabase
     .from("conversations")
@@ -21,6 +21,7 @@ export default async function InboxPage({searchParams}:{searchParams:Promise<{co
     <InboxView
       conversations={items}
       initialConversationId={requested}
+      isOwner={role==="owner"}
       workspaceId={workspace.id}
     />
   );
