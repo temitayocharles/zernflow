@@ -33,16 +33,7 @@ export function getSocialGatewayClient(): SocialGatewayClient | null {
     return cachedClient;
   }
 
-  cachedClient = new HttpSocialGatewayClient({
-    baseUrl: process.env.SOCIAL_GATEWAY_BASE_URL ?? "",
-    operatorApiKey: process.env.SOCIAL_GATEWAY_API_KEY ?? "",
-    adminApiKey: process.env.SOCIAL_GATEWAY_ADMIN_API_KEY,
-    agentCredential: process.env.SOCIAL_GATEWAY_AGENT_CREDENTIAL,
-    actorRef: process.env.SOCIAL_GATEWAY_ACTOR_REF ?? "zernflow",
-    workspaceRef: process.env.SOCIAL_GATEWAY_WORKSPACE_REF ?? "default",
-    timeoutMs: parseTimeout(process.env.SOCIAL_GATEWAY_TIMEOUT_MS),
-    production: process.env.NODE_ENV === "production",
-  });
+  cachedClient = createActorClient(process.env.SOCIAL_GATEWAY_ACTOR_REF ?? "zernflow");
   return cachedClient;
 }
 
@@ -61,4 +52,22 @@ export function resetSocialGatewayClientForTests(): void {
     throw new Error("Social gateway client reset is restricted to tests");
   }
   cachedClient = undefined;
+}
+
+function createActorClient(actorRef:string):SocialGatewayClient {
+  return new HttpSocialGatewayClient({
+    baseUrl: process.env.SOCIAL_GATEWAY_BASE_URL ?? "",
+    operatorApiKey: process.env.SOCIAL_GATEWAY_API_KEY ?? "",
+    adminApiKey: process.env.SOCIAL_GATEWAY_ADMIN_API_KEY,
+    agentCredential: process.env.SOCIAL_GATEWAY_AGENT_CREDENTIAL,
+    actorRef,
+    workspaceRef: process.env.SOCIAL_GATEWAY_WORKSPACE_REF ?? "default",
+    timeoutMs: parseTimeout(process.env.SOCIAL_GATEWAY_TIMEOUT_MS),
+    production: process.env.NODE_ENV === "production",
+  });
+}
+/** actorRef is derived only from the authenticated server-side user, never request JSON. */
+export function requireOperatorGatewayClient(userId:string):SocialGatewayClient {
+  if(!isSocialGatewayConfigured())throw new SocialGatewayConfigurationError("Agent Social Gateway is not configured for this deployment");
+  return createActorClient(`zernflow:user:${userId}`);
 }
