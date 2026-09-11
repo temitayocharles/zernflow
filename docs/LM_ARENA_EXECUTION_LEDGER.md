@@ -39,7 +39,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Wire the opt-in message cursor API to a Load older messages inbox control with deduplication, cancellation and retry handling; then verify work-item ownership from canonical Gateway docs before adding tenant-isolated schema and connecting `lib/service-desk/sla.ts`.
+Verify canonical Gateway work-item and collaboration ownership/contracts (GitHub API currently returns 404). Then implement tenant-isolated reusable work-item schema/API and connect `lib/service-desk/sla.ts`; do not invent a parallel ticket ledger. Independently add browser integration tests for inbox selection races, optimistic sends, and pagination scroll anchoring.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -64,3 +64,8 @@ Wire the opt-in message cursor API to a Load older messages inbox control with d
 - [x] CODE COMPLETE / LOCAL VALIDATION COMPLETE: deterministic calendar-time SLA objectives, priority overrides, independent response/resolution pauses, warning and breach boundaries, completion history, escalation signals.
 - 25 new SLA cases; total 156 tests / 20 files pass. Typecheck and lint pass (44 baseline warnings).
 - `docs/SLA_ENGINE.md` defines exact semantics and explicit exclusions. No ticket tables/UI or escalation execution claimed complete.
+
+### Inbox cursor UI slice
+- [x] CODE COMPLETE: Load older messages with validated cursor pages, deduplication, cancellation on conversation changes, explicit retry errors, and repeated-cursor rejection.
+- [x] Preserve loaded history and optimistic messages when pages/realtime refreshes merge. Keep scroll position when prepending history.
+- LOCAL VALIDATION COMPLETE: typecheck and Node 24/npm 11 production build pass; 165 tests / 21 files including page parsing/merge/foreign-conversation guards. Live browser pagination/scroll acceptance remains required.

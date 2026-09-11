@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Send, Paperclip, Bot, User, MessageSquare, CheckCircle, Clock, RotateCcw, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { mergeMessagePages } from "@/lib/inbox/message-page";
 import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/platform-icon";
 import type { Database, ConversationStatus } from "@/lib/types/database";
@@ -127,6 +128,7 @@ export function MessageThread({
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollSnapshot = useRef({ first: "", last: "", height: 0 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const updateConversationStatus = useCallback(async (status: ConversationStatus) => {
@@ -154,16 +156,26 @@ export function MessageThread({
   }, []);
 
   useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
+    if (conversation) setMessages(current => mergeMessagePages(initialMessages, current, conversation.id));
+  }, [initialMessages, conversation]);
 
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Keep the viewport anchored when older pages are prepended.
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const first = messages[0]?.id ?? "";
+    const last = messages.at(-1)?.id ?? "";
+    const previous = scrollSnapshot.current;
+    if (previous.first && first !== previous.first && last === previous.last) {
+      container.scrollTop += container.scrollHeight - previous.height;
+    } else if (last !== previous.last) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    scrollSnapshot.current = { first, last, height: container.scrollHeight };
   }, [messages]);
 
   // Listen for conversation updates (last_message_at changes when a new message arrives)
-  // and re-fetch messages from Zernio API.
+  // and re-fetch authoritative messages from the Gateway-backed API.
   useEffect(() => {
     if (!conversation) return;
 
@@ -186,8 +198,7 @@ export function MessageThread({
             if (res.ok) {
               const freshMessages = await res.json();
               setMessages((prev) => {
-                const optimistic = prev.filter((m) => m.id.startsWith("optimistic-"));
-                return [...freshMessages, ...optimistic];
+                return mergeMessagePages(freshMessages, prev, conversation.id);
               });
             }
           } catch (err) {
