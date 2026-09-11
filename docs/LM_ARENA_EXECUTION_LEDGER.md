@@ -39,7 +39,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Implement deterministic SLA deadline/evaluation functions in `lib/service-desk/sla.ts` with priority overrides, pause accounting, warning/breach boundaries and tests; then connect to the reusable work-item domain once ownership is verified. Complete message pagination UI separately using the new opt-in cursor API.
+Wire the opt-in message cursor API to a Load older messages inbox control with deduplication, cancellation and retry handling; then verify work-item ownership from canonical Gateway docs before adding tenant-isolated schema and connecting `lib/service-desk/sla.ts`.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -59,3 +59,8 @@ Implement deterministic SLA deadline/evaluation functions in `lib/service-desk/s
 - LOCAL VALIDATION COMPLETE: 131 tests / 19 files; production build under Node 24/npm 11 passed; lint zero errors / 44 warnings. Route tests cover unauthenticated access, RLS-hidden references, invalid bodies and pagination forwarding. UI race behavior still needs browser acceptance.
 - No database or Gateway endpoint changes. Client-side pagination controls remain incomplete; API support alone is not inbox completion.
 - Inspection found no operator collaboration API/UI despite existing Gateway client methods. Exposing approval/assignment requires verifying authoritative workspace/actor scoping (canonical Gateway docs inaccessible).
+
+### SLA foundation slice
+- [x] CODE COMPLETE / LOCAL VALIDATION COMPLETE: deterministic calendar-time SLA objectives, priority overrides, independent response/resolution pauses, warning and breach boundaries, completion history, escalation signals.
+- 25 new SLA cases; total 156 tests / 20 files pass. Typecheck and lint pass (44 baseline warnings).
+- `docs/SLA_ENGINE.md` defines exact semantics and explicit exclusions. No ticket tables/UI or escalation execution claimed complete.
