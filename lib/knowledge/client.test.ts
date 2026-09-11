@@ -1,0 +1,93 @@
+import { describe, expect, it, vi } from "vitest";
+import { HttpKnowledgeClient, parseRetrieval } from "./client";
+const result = {
+  requestId: "r",
+  indexingStatus: "ready",
+  citations: [
+    {
+      sourceRef: "s",
+      title: "Title",
+      excerpt: "Context",
+      url: "https://example.com",
+      score: 0.5,
+    },
+  ],
+};
+describe("external knowledge seam", () => {
+  it("rejects foreign citations and unsafe links", () => {
+    expect(() => parseRetrieval(result, ["other"])).toThrow();
+    expect(() =>
+      parseRetrieval(
+        {
+          ...result,
+          citations: [{ ...result.citations[0], url: "javascript:alert(1)" }],
+        },
+        ["s"],
+      ),
+    ).toThrow();
+  });
+  it("uses configured endpoint with scoped source references and no redirects", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(result)));
+    const client = new HttpKnowledgeClient(
+      "https://knowledge.example/retrieve",
+      "test-token",
+      fetcher,
+    );
+    expect(
+      (
+        await client.retrieve({
+          workspaceRef: "ws",
+          sourceRefs: ["s"],
+          query: "Question",
+          limit: 5,
+        })
+      ).citations,
+    ).toHaveLength(1);
+    expect(fetcher).toHaveBeenCalledWith(
+      expect.any(URL),
+      expect.objectContaining({
+        redirect: "error",
+        cache: "no-store",
+        body: JSON.stringify({
+          workspaceRef: "ws",
+          sourceRefs: ["s"],
+          query: "Question",
+          limit: 5,
+        }),
+      }),
+    );
+  });
+  it("rejects insecure endpoints and missing tokens", () => {
+    expect(
+      () => new HttpKnowledgeClient("http://example.com", "token"),
+    ).toThrow();
+    expect(
+      () => new HttpKnowledgeClient("https://user:secret@example.com", "token"),
+    ).toThrow();
+    expect(() => new HttpKnowledgeClient("https://example.com", "")).toThrow();
+  });
+  it("fails closed for upstream errors and oversized results", async () => {
+    const request = {
+      workspaceRef: "w",
+      sourceRefs: ["s"],
+      query: "q",
+      limit: 5,
+    };
+    await expect(
+      new HttpKnowledgeClient(
+        "https://example.com",
+        "token",
+        vi.fn().mockResolvedValue(new Response("", { status: 503 })),
+      ).retrieve(request),
+    ).rejects.toThrow();
+    await expect(
+      new HttpKnowledgeClient(
+        "https://example.com",
+        "token",
+        vi.fn().mockResolvedValue(new Response("x".repeat(1_000_001))),
+      ).retrieve(request),
+    ).rejects.toThrow("too large");
+  });
+});
