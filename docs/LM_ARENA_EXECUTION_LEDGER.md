@@ -20,11 +20,11 @@
 - [ ] Gateway canonical repository access: GitHub contents API for `temitayocharles/agent-social-gateway` returns HTTP 404; no canonical docs were retrieved.
 - [ ] Disposable Supabase and Gateway runtime for integration/smoke acceptance (no credentials supplied).
 ## Known Defects / Technical Debt
-- [ ] Baseline build fails fetching Inter from Google Fonts (TLS/network failure).
-- [ ] Environment ships Node 22.22.3/npm 10.9.8; project requires Node 24/npm 11.
+- [x] Fixed baseline external-font build failure by bundling licensed Inter locally.
+- [x] Node 24/npm 11 validation available through `npm exec --package=node@24 --package=npm@11 -- npm ...`; default shell remains Node 22.
 - [ ] Baseline lint has 45 warnings. Production audit: 3 low vulnerabilities, zero high; full dependency audit additionally reports development vulnerabilities.
-- [ ] Legacy smoke script defaults to a deployed host and hardcoded tenant/account IDs; must not execute against production as a local baseline.
-- [ ] README retains superseded Postiz and branch setup language.
+- [x] Removed legacy smoke remote defaults; explicit write acknowledgement, origins/UUID validation and tenant/channel/account preflight now required. Legacy smoke is not Gateway certification.
+- [x] Corrected superseded README Postiz and branch setup language.
 ## Important Decisions
 - Work stays on the Arena-assigned branch; never recreate or switch to the user-suggested continuation branch.
 - No new provider backend or assumed endpoints. Existing Meta readiness/connection API and Telegram sync/reply seam are reused.
@@ -39,10 +39,15 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Remove build-time external font retrieval while preserving Inter, and replace unsafe smoke defaults with explicit disposable target configuration and testable guards. Then inspect collaboration/inbox implementation before choosing the next product slice.
+Inspect `app/api/v1/social-gateway/` and `components/inbox/` for collaboration authorization and missing UI; implement the first safe missing control using existing contracts.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
 - `npm test`: 97 passed / 16 files, including 9 registry cases and existing Meta route tests.
 - `npm run lint`: zero errors, unchanged 45 warnings.
 - No migration or new provider/backend endpoint. Runtime provider support remains uncertified.
+
+### Reproducible validation slice
+- Node 24/npm 11 production build: passed (Inter bundled locally).
+- Typecheck: passed; Vitest: 112 passed / 17 files; lint: zero errors / 45 baseline warnings.
+- Smoke guard unit coverage: 15 cases; live smoke remains not run without disposable runtime.

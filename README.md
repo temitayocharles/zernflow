@@ -17,7 +17,7 @@ human handoff, sequences and scheduled job execution
 provider accounts, OAuth, Vault credentials, normalized events,
 authoritative conversations/messages, durable operations, REST and MCP
             |
- Postiz and direct provider APIs
+ Maintained connectors and official provider APIs
             |
 Facebook, Instagram, WhatsApp, Telegram, LinkedIn,
 TikTok and other supported channels
@@ -40,7 +40,7 @@ Agent Social Gateway owns:
 - normalized inbound events and authoritative messages and conversations;
 - durable outbound operations, retries, reconciliation and dead letters;
 - provider policy, approvals, agent identities, REST and MCP execution contracts;
-- Postiz integration for publishing and scheduling where Postiz is the best downstream engine.
+- Transitional Postiz compatibility only until replacement publishing/calendar/media paths are accepted; no new strategic Postiz dependencies.
 
 Zernio is an optional compatibility provider only. Legacy `@zernio/node` access is disabled unless the server-only environment value `ENABLE_LEGACY_ZERNIO=true` is set exactly. New work must use Agent Social Gateway.
 
@@ -57,7 +57,7 @@ Zernio is an optional compatibility provider only. Legacy `@zernio/node` access 
 - analytics events and operator-visible processing state;
 - bounded legacy Zernio fallback for migration-only paths.
 
-Provider availability remains capability-driven. An action is exposed only when the official provider API, Postiz or an explicitly configured compatibility provider supports it.
+Provider availability remains capability-driven. An action is exposed only when the configured Gateway connector reports support and live acceptance has confirmed it. A local channel card alone is not evidence of support.
 
 ## Prerequisites
 
@@ -76,7 +76,6 @@ Postiz is configured behind Agent Social Gateway, not in the browser and not in 
 ```bash
 git clone https://forgejo.tca-infraforge.site/temitayocharles/zernflow.git
 cd zernflow
-git checkout feature/foundation-gateway-seam
 npm ci
 cp .env.example .env.local
 ```
@@ -130,6 +129,8 @@ The canonical Forgejo CI uses Node 24 and requires all of the following:
 - strict TypeScript compilation;
 - the Vitest suite;
 - a successful Next.js production build.
+
+See `docs/LOCAL_VALIDATION.md` for offline font builds and explicit, disposable-target legacy smoke configuration.
 
 ## Gateway event delivery
 
