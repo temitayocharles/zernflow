@@ -1,0 +1,86 @@
+import { readJson } from "@/lib/product/api";
+import {
+  ApiError,
+  databaseError,
+  failure,
+  json,
+  productContext,
+} from "@/lib/product/api";
+import { object, text, uuid } from "@/lib/product/validation";
+const targets = {
+  companies: "company_id",
+  contacts: "contact_id",
+  deals: "deal_id",
+  work_items: "work_item_id",
+  conversations: "conversation_id",
+} as const;
+async function target(request: Request) {
+  const url = new URL(request.url);
+  const kind = url.searchParams.get("kind") ?? "";
+  if (!Object.hasOwn(targets, kind))
+    throw new ApiError(400, "Invalid activity target");
+  const id = uuid(url.searchParams.get("id"), "id");
+  const ctx = await productContext();
+  const { data, error } = await ctx.supabase
+    .from(kind as keyof typeof targets)
+    .select("id")
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("id", id)
+    .maybeSingle();
+  databaseError(error);
+  if (!data) throw new ApiError(404, "Record not found");
+  return { ...ctx, id, kind: kind as keyof typeof targets };
+}
+export async function GET(request: Request) {
+  try {
+    const { supabase, workspaceId, kind, id } = await target(request);
+    const [notes, activity] = await Promise.all([
+      supabase
+        .from("customer_notes")
+        .select()
+        .eq("workspace_id", workspaceId)
+        .eq(targets[kind], id)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("product_activity")
+        .select()
+        .eq("workspace_id", workspaceId)
+        .eq("entity_type", kind)
+        .eq("entity_id", id)
+        .order("created_at", { ascending: false })
+        .limit(100),
+    ]);
+    databaseError(notes.error);
+    databaseError(activity.error);
+    return json({ notes: notes.data, activity: activity.data });
+  } catch (e) {
+    return failure(e);
+  }
+}
+export async function POST(request: Request) {
+  try {
+    const { supabase, workspaceId, kind, id, user } = await target(request);
+    const input = object(await readJson(request));
+    const body = text(input.body, "note", 10000, true);
+    const mentions = input.mention_ids ?? [];
+    if (!Array.isArray(mentions) || mentions.length > 20)
+      throw new ApiError(400, "Invalid mentions");
+    const mention_ids = mentions.map((v) => uuid(v, "mention"));
+    const { data, error } = await supabase
+      .from("customer_notes")
+      .insert({
+        workspace_id: workspaceId,
+        [targets[kind]]: id,
+        body,
+        mention_ids,
+        author_id: user.id,
+      })
+      .select()
+      .single();
+    databaseError(error);
+    return json(data, 201);
+  } catch (e) {
+    return failure(e);
+  }
+}
