@@ -26,6 +26,8 @@ export function InboxView({
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
   const [showContactPanel, setShowContactPanel] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -51,46 +53,53 @@ export function InboxView({
   }
 
   const handleSelect = useCallback((conversation: Conversation) => {
+    if (selected?.id === conversation.id) return;
+    setLoadingMessages(true);
+    setMessages([]);
+    setMessageError(null);
     setSelected(conversation);
-  }, []);
+  }, [selected?.id]);
 
   useEffect(() => {
     if (!selected) {
       setMessages([]);
       return;
     }
-
+    const conversation = selected;
+    const controller = new AbortController();
     async function loadMessages() {
       setLoadingMessages(true);
+      setMessageError(null);
+      setMessages([]);
       try {
         const response = await fetch(
-          `/api/v1/messages?conversationId=${selected!.id}`,
+          `/api/v1/messages?conversationId=${encodeURIComponent(conversation.id)}`,
+          { signal: controller.signal },
         );
-        if (response.ok) {
-          const data = await response.json();
-          setMessages(data ?? []);
-        } else {
-          console.error("Failed to load messages:", response.status);
-          setMessages([]);
+        if (!response.ok) throw new Error("Unable to load messages. Retry or check the Gateway connection.");
+        const data = await response.json();
+        if (!Array.isArray(data)) throw new Error("Gateway returned an invalid message response.");
+        if (controller.signal.aborted) return;
+        setMessages(data);
+        // Do not clear unread state when delivery failed, selection changed, or
+        // a newer event changed the observed count while this read was in flight.
+        if (conversation.unread_count > 0) {
+          const { error } = await createClient().from("conversations")
+            .update({ unread_count: 0 })
+            .eq("id", conversation.id)
+            .eq("workspace_id", workspaceId)
+            .eq("unread_count", conversation.unread_count);
+          if (error && !controller.signal.aborted) setMessageError("Messages loaded, but marking the conversation read failed. Retry to update unread state.");
         }
       } catch (error) {
-        console.error("Failed to load messages:", error);
-        setMessages([]);
+        if (!controller.signal.aborted) setMessageError(error instanceof Error ? error.message : "Unable to load messages.");
       } finally {
-        setLoadingMessages(false);
-      }
-
-      if (selected!.unread_count > 0) {
-        const supabase = createClient();
-        await supabase
-          .from("conversations")
-          .update({ unread_count: 0 })
-          .eq("id", selected!.id);
+        if (!controller.signal.aborted) setLoadingMessages(false);
       }
     }
-
-    loadMessages();
-  }, [selected?.id]);
+    void loadMessages();
+    return () => controller.abort();
+  }, [selected, workspaceId, reload]);
 
   return (
     <div className="flex h-full">
@@ -139,12 +148,17 @@ export function InboxView({
                 <p className="mt-2 text-xs text-destructive">{syncError}</p>
               )}
             </div>
+          ) : messageError ? (
+            <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+              <p className="text-sm text-destructive">{messageError}</p>
+              <button onClick={() => setReload(value => value + 1)} className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted">Retry loading messages</button>
+            </div>
           ) : loadingMessages && selected ? (
             <div className="flex h-full items-center justify-center">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
             </div>
           ) : (
-            <MessageThread conversation={selected} messages={messages} />
+            <MessageThread key={selected?.id ?? "empty"} conversation={selected} messages={messages} />
           )}
         </div>
       </div>

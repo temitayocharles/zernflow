@@ -39,7 +39,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Inspect `app/api/v1/social-gateway/` and `components/inbox/` for collaboration authorization and missing UI; implement the first safe missing control using existing contracts.
+Implement deterministic SLA deadline/evaluation functions in `lib/service-desk/sla.ts` with priority overrides, pause accounting, warning/breach boundaries and tests; then connect to the reusable work-item domain once ownership is verified. Complete message pagination UI separately using the new opt-in cursor API.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -51,3 +51,11 @@ Inspect `app/api/v1/social-gateway/` and `components/inbox/` for collaboration a
 - Node 24/npm 11 production build: passed (Inter bundled locally).
 - Typecheck: passed; Vitest: 112 passed / 17 files; lint: zero errors / 45 baseline warnings.
 - Smoke guard unit coverage: 15 cases; live smoke remains not run without disposable runtime.
+
+### Inbox safety slice
+- [x] CODE COMPLETE: abort superseded inbox reads, isolate composer state per conversation, expose retryable load errors, avoid marking failed reads as read, compare observed unread count before clearing.
+- [x] CODE COMPLETE: optional provider-neutral message cursor response (`paginated=true`, `cursor`, bounded `limit`), preserving legacy array response by default.
+- [x] Fixed null/non-object POST bodies that previously could throw outside validation.
+- LOCAL VALIDATION COMPLETE: 131 tests / 19 files; production build under Node 24/npm 11 passed; lint zero errors / 44 warnings. Route tests cover unauthenticated access, RLS-hidden references, invalid bodies and pagination forwarding. UI race behavior still needs browser acceptance.
+- No database or Gateway endpoint changes. Client-side pagination controls remain incomplete; API support alone is not inbox completion.
+- Inspection found no operator collaboration API/UI despite existing Gateway client methods. Exposing approval/assignment requires verifying authoritative workspace/actor scoping (canonical Gateway docs inaccessible).

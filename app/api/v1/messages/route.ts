@@ -1,3 +1,4 @@
+import { parseMessageQuery } from "@/lib/inbox/message-query";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -87,10 +88,13 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const conversationId = request.nextUrl.searchParams.get("conversationId")?.trim();
-  if (!conversationId) {
-    return NextResponse.json({ error: "conversationId required" }, { status: 400 });
+  let query: ReturnType<typeof parseMessageQuery>;
+  try {
+    query = parseMessageQuery(request.nextUrl.searchParams);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid query" }, { status: 400 });
   }
+  const { conversationId } = query;
 
   const conversation = await getLocalConversation(conversationId);
   if (!conversation?.late_conversation_id) {
@@ -103,10 +107,13 @@ export async function GET(request: NextRequest) {
   try {
     const gateway = requireSocialGatewayClient();
     const detail = await gateway.getConversation(conversation.late_conversation_id, {
-      messageLimit: 200,
+      messageLimit: query.limit,
+      messageCursor: query.cursor,
     });
+    const messages = detail.messages.map((message) => mapGatewayMessage(message, conversationId));
     return NextResponse.json(
-      detail.messages.map((message) => mapGatewayMessage(message, conversationId)),
+      query.paginated ? { messages, nextCursor: detail.next_message_cursor } : messages,
+      { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     return gatewayErrorResponse(error, "fetch messages");
@@ -129,7 +136,11 @@ export async function POST(request: NextRequest) {
 
   let body: SendMessageBody;
   try {
-    body = (await request.json()) as SendMessageBody;
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "JSON body must be an object" }, { status: 400 });
+    }
+    body = parsed as SendMessageBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
