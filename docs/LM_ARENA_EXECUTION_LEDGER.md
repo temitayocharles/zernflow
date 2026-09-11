@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Add migration 00022 for reusable work items and queues with tenant-consistent CRM/conversation references, immutable reference numbering and status/activity guards. Wire existing SLA calculations to persisted policy snapshots and build work-item API/list/detail/Kanban views.
+Implement migration 00023 for member-scoped notifications and inbox internal notes/canned replies. Add permission-aware collaboration controls using the existing assignConversation/escalateConversation/setHumanTakeover client methods, keeping unverifiable approval-list and policy execution APIs explicitly unavailable.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -86,3 +86,10 @@ Add migration 00022 for reusable work items and queues with tenant-consistent CR
 - Added authenticated scoped CRM list/create/detail/update APIs, optimistic version checks, actual CRM list/detail/edit screens, relationship selectors, internal notes and activity UI.
 - LOCAL VALIDATION: 182 tests / 23 files pass, including PostgreSQL (PGlite) execution of actual migrations 00001/00002/00021 and seven RLS/constraint/audit tests; lint 44 baseline warnings, no errors. Build validation recorded at commit.
 - Migration application and authenticated live browser acceptance remain external. Gateway access does not block local product domain implementation.
+
+## Work-item persistence and SLA product slice
+- CODE COMPLETE: forward migration 00022 adds reusable work items (ticket/task/incident/follow-up), queues, stable generated references, workspace-consistent assignees/requesters/company/conversation links, immutable calendar-time SLA snapshots, response/resolution recording, escalation state and guarded close/reopen transitions.
+- Built authenticated list/create/detail/update APIs with version conflicts; list/search/status/queue/mine filters, paginated Kanban, detail/edit/status/response/escalation controls, internal notes/activity and actual SLA warning/breach presentation.
+- Conversation → work-item creation and reverse inbox deep links implemented. Contact Customer 360 now links profiles, companies, opportunities, work items and internal notes.
+- LOCAL VALIDATION: 189 tests / 24 files, build and typecheck pass; lint unchanged 44 warnings. PostgreSQL tests execute actual migration 00022 and verify immutable numbering/SLA, transitions, response preservation and cross-workspace references.
+- No background escalation is claimed: SLA breach is calculated and shown; notification scheduling remains the next product integration.

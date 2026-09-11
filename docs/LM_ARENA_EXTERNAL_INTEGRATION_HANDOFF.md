@@ -95,3 +95,27 @@ Durable customer entities, immutable notes/audit attribution, safe relationships
 Missing tables (migration not applied), foreign records visible, silent conflicts, or forged audit attribution.
 ### Rollback consideration
 Roll back application independently and retain customer data. Do not drop new tables in production as an automatic rollback.
+
+## ITEM: Work-item rollout
+### Code status
+COMPLETE
+### Repository evidence
+Commit: work-item slice on PR #11.
+Files: `supabase/migrations/00022_work_items.sql`, `lib/service-desk/work-items.ts`, `app/api/v1/work-items/`, `app/(dashboard)/dashboard/work-items/`.
+Tests: PostgreSQL work-item/RLS tests and domain validation tests (189 total tests at slice).
+### External system
+Supabase / Northflank
+### Exact action required
+Apply migration 00022 after 00021. Accept ticket/task/incident/follow-up CRUD, queues, requester/company/conversation cross-links, first response and resolution records in an isolated tenant before promotion.
+### Environment variables / secret names
+Existing Supabase configuration only.
+### Endpoint or callback expected
+`/dashboard/work-items`, `/api/v1/work-items`, `/api/v1/work-queues`
+### Verification procedure
+Create work from inbox, filter by queue/assignee, inspect Kanban, resolve/close/reopen, check stale-write conflicts, compare displayed SLA to snapshotted targets. Verify another workspace cannot link/read items or assign a nonmember.
+### Expected success result
+Stable references and durable reusable work records; no duplicate provider ledger or false message sends.
+### Failure symptoms
+Missing relations, cross-tenant links, changed snapshots, stale overwrite, or invalid transitions accepted.
+### Rollback consideration
+Keep persisted work data. Roll back application without dropping tables or resetting existing migrations.

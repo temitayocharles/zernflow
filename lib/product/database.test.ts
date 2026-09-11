@@ -10,6 +10,7 @@ beforeAll(async()=>{
   await db.exec(readFileSync('supabase/migrations/00001_initial_schema.sql','utf8').replace('create extension if not exists "uuid-ossp";',''));
   await db.exec(readFileSync('supabase/migrations/00002_rls_policies.sql','utf8'));
   await db.exec(readFileSync('supabase/migrations/00021_crm_foundations.sql','utf8'));
+  await db.exec(readFileSync('supabase/migrations/00022_work_items.sql','utf8'));
   await db.exec(`insert into auth.users values('${user}'); insert into workspaces(id,name,slug) values('${ws}','A','a'),('${other}','B','b'); insert into workspace_members(workspace_id,user_id) values('${ws}','${user}'); grant usage on schema public,auth to authenticated; grant select,insert,update,delete on all tables in schema public to authenticated; select set_config('request.jwt.claim.sub','${user}',false); set role authenticated;`);
 },30000);
 afterAll(async()=>{await db.close();});
@@ -46,4 +47,28 @@ describe('CRM migration PostgreSQL constraints and RLS',()=>{
     await db.exec(`update deals set stage='new' where id='${rows[0].id}'`);
     expect((await db.query<{closed_at:null}>(`select closed_at from deals where id='${rows[0].id}'`)).rows[0].closed_at).toBeNull();
   });
+});
+
+describe('Work item persistence',()=>{
+ it('enforces transitions and immutable SLA snapshots',async()=>{
+  const {rows}=await db.query<{id:string;reference:number}>(`insert into work_items(workspace_id,name) values('${ws}','Ticket') returning id,reference`);const id=rows[0].id;
+  expect(rows[0].reference).toBeTruthy();
+  await expect(db.exec(`update work_items set status='closed' where id='${id}'`)).rejects.toThrow();
+  await expect(db.exec(`update work_items set first_response_minutes=30 where id='${id}'`)).rejects.toThrow();
+  await db.exec(`update work_items set status='resolved',first_responded_at=now() where id='${id}'`);
+  const done=await db.query<{resolved_at:string;first_responded_at:string}>(`select resolved_at,first_responded_at from work_items where id='${id}'`);expect(done.rows[0].resolved_at).toBeTruthy();
+  await db.exec(`update work_items set status='closed' where id='${id}';update work_items set status='open',first_responded_at=null where id='${id}'`);
+  const reopened=await db.query<{resolved_at:null;first_responded_at:string}>(`select resolved_at,first_responded_at from work_items where id='${id}'`);expect(reopened.rows[0].resolved_at).toBeNull();expect(reopened.rows[0].first_responded_at).toEqual(done.rows[0].first_responded_at);
+ });
+ it('rejects foreign assignees, queues, escalation without reason',async()=>{
+  await expect(db.exec(`insert into work_items(workspace_id,name,assignee_id) values('${ws}','Bad','20000000-0000-4000-8000-000000000002')`)).rejects.toThrow();
+  await expect(db.exec(`insert into work_items(workspace_id,name,escalated) values('${ws}','Bad',true)`)).rejects.toThrow();
+  await db.exec(`reset role;insert into work_queues(id,workspace_id,name) values('40000000-0000-4000-8000-000000000001','${other}','Other queue');set role authenticated;`);
+  await expect(db.exec(`insert into work_items(workspace_id,name,queue_id) values('${ws}','Bad','40000000-0000-4000-8000-000000000001')`)).rejects.toThrow();
+ });
+ it('rejects forged ticket numbers and accepts internal notes',async()=>{
+  const {rows}=await db.query<{id:string}>(`insert into work_items(workspace_id,name) values('${ws}','Note target') returning id`);
+  await expect(db.exec(`update work_items set reference=999999 where id='${rows[0].id}'`)).rejects.toThrow();
+  await db.exec(`insert into customer_notes(workspace_id,work_item_id,body) values('${ws}','${rows[0].id}','Ticket note')`);
+ });
 });

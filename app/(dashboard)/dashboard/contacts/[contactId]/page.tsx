@@ -1,3 +1,4 @@
+import {Customer360} from "@/components/product/customer-360";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getWorkspace } from "@/lib/workspace";
@@ -254,6 +255,7 @@ export default async function ContactDetailPage({
           )}
         </div>
       </div>
+      <Customer360 contactId={contactId}/>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageSquare, RefreshCw, User } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { CreateWorkItem } from "@/components/product/create-work-item";
 import { ContactPanel } from "@/components/inbox/contact-panel";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { MessageThread } from "@/components/inbox/message-thread";
@@ -19,12 +20,14 @@ type Message = Database["public"]["Tables"]["messages"]["Row"];
 export function InboxView({
   conversations,
   workspaceId,
+  initialConversationId,
 }: {
   conversations: Conversation[];
   workspaceId: string;
+  initialConversationId?:string;
 }) {
   const router = useRouter();
-  const [selected, setSelected] = useState<Conversation | null>(null);
+  const [selected, setSelected] = useState<Conversation | null>(conversations.find(c=>c.id===initialConversationId)??null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
@@ -152,6 +155,7 @@ export function InboxView({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
+        {selected && <div className="border-b border-border p-2"><CreateWorkItem conversationId={selected.id} contactId={selected.contact_id}/></div>}
         {selected && !showContactPanel && (
           <div className="flex shrink-0 justify-end border-b border-border px-2 py-1">
             <button
