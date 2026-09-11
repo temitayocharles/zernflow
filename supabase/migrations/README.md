@@ -7,7 +7,7 @@ Current required range:
 ```text
 00001_initial_schema.sql
 ...
-00026_product_integrity_directory.sql
+00027_atomic_work_updates.sql
 ```
 
 Do not concatenate the files into an aggregate SQL script and do not selectively copy statements between migrations. Later migrations intentionally alter constraints, policies, indexes and security-definer functions established by earlier files.
@@ -23,7 +23,7 @@ supabase db push
 supabase migration list
 ```
 
-The second `migration list` must show migrations `00001` through `00026` as applied to the remote project.
+The second `migration list` must show migrations `00001` through `00027` as applied to the remote project.
 
 For a disposable local Supabase environment, rebuild from the complete numbered history:
 
@@ -112,7 +112,7 @@ Workspace updates and channel inserts, updates and deletes must be owner-scoped.
 A ZernFlow release that includes gateway-backed inbox, sequences, broadcasts or signed gateway webhooks is not production-ready unless the target database has applied migrations `00016` through `00020` in addition to the earlier schema history.
 
 
-## Product-domain migrations 00021–00026
+## Product-domain migrations 00021–00027
 
 - 00021: companies, customer profiles, opportunities, internal notes, audit.
 - 00022: reusable work items, queues, SLA snapshots and guarded transitions.
@@ -149,3 +149,5 @@ may configure knowledge/mailboxes or approve editorial drafts. Test stale
 version conflicts and composite foreign keys from API and direct PostgREST.
 No automatic down migration is provided: retain customer/work records when
 rolling back application code, rather than destructively dropping tables.
+
+- 00027: atomic membership-scoped, version-safe bulk work status/priority updates; no partial writes on conflict.

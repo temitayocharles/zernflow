@@ -334,3 +334,44 @@ describe("Directory and record integrity", () => {
     await db.exec(`select set_config('request.jwt.claim.sub','${user}',false)`);
   });
 });
+
+describe("Atomic bulk work changes", () => {
+  it("rolls back all selected changes when one version is stale", async () => {
+    const { rows } = await db.query<{ id: string; version: number }>(
+      `insert into work_items(workspace_id,name) values('${ws}','Bulk A'),('${ws}','Bulk B') returning id,version`,
+    );
+    const changes = rows.map((r, index) => ({
+      ...r,
+      version: index === 0 ? r.version : 999,
+      status: "resolved",
+    }));
+    await expect(
+      db.query(`select bulk_update_work_items($1,$2::jsonb)`, [
+        ws,
+        JSON.stringify(changes),
+      ]),
+    ).rejects.toThrow();
+    const current = await db.query<{ status: string }>(
+      `select status from work_items where id=any($1::uuid[])`,
+      [rows.map((r) => r.id)],
+    );
+    expect(current.rows.every((r) => r.status === "open")).toBe(true);
+    const valid = rows.map((r) => ({ ...r, status: "resolved" }));
+    expect(
+      (
+        await db.query<{ updated: number }>(
+          `select bulk_update_work_items($1,$2::jsonb) as updated`,
+          [ws, JSON.stringify(valid)],
+        )
+      ).rows[0].updated,
+    ).toBe(2);
+  });
+  it("rejects foreign workspace bulk execution", async () => {
+    await expect(
+      db.query(`select bulk_update_work_items($1,$2::jsonb)`, [
+        other,
+        JSON.stringify([{ id: company, version: 1, status: "open" }]),
+      ]),
+    ).rejects.toThrow();
+  });
+});

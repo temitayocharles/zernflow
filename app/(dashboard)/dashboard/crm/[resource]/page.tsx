@@ -66,19 +66,23 @@ export default async function CrmPage({
           />
         </div>
       </details>
-      <form className="flex gap-2">
-        <label className="sr-only" htmlFor="crm-search">
-          Search names
-        </label>
-        <input
-          id="crm-search"
-          name="q"
-          defaultValue={search.q}
-          placeholder="Search names"
-          className="rounded-lg border border-border bg-background p-2"
-        />
-        <button className="rounded-lg border border-border px-3">Search</button>
-      </form>
+      {resource !== "customer_profiles" && (
+        <form className="flex gap-2">
+          <label className="sr-only" htmlFor="crm-search">
+            Search names
+          </label>
+          <input
+            id="crm-search"
+            name="q"
+            defaultValue={search.q}
+            placeholder="Search names"
+            className="rounded-lg border border-border bg-background p-2"
+          />
+          <button className="rounded-lg border border-border px-3">
+            Search
+          </button>
+        </form>
+      )}
       <p className="text-sm text-muted-foreground">
         {count ?? 0} records · Reference selectors show the first 200
         contacts/companies.

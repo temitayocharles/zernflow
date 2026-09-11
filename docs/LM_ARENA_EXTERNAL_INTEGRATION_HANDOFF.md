@@ -215,3 +215,27 @@ Safe human-readable teammate selection and consistent responsive operator naviga
 Foreign directory rows, leaked auth metadata, cleared relationships, blocked member departure, or inaccessible mobile controls.
 ### Rollback consideration
 Keep recorded customer/work data. Revert UI independently of constraints; never loosen RLS to repair a rollout.
+
+## ITEM: Atomic bulk work rollout
+### Code status
+COMPLETE
+### Repository evidence
+Commit: atomic bulk/interactions slice on PR #11.
+Files: migration 00027, bulk work API/UI and tests; queue/reply editing and paging.
+Tests: PostgreSQL all-or-nothing rollback and tenant denial; React DOM form/inbox interaction tests; 257 total tests at slice.
+### External system
+Supabase / browser
+### Exact action required
+Apply 00027 and accept bulk status/priority updates with concurrent operators; verify editing and paging in real browsers. No new external adapter or credential is needed.
+### Environment variables / secret names
+Existing Supabase configuration.
+### Endpoint or callback expected
+POST `/api/v1/work-items/bulk`; `bulk_update_work_items(uuid,jsonb)`.
+### Verification procedure
+Select multiple work items, make one stale in another session, confirm entire batch rejects without partial updates. Verify invalid transitions and other-workspace IDs roll back the batch. Confirm notes/audit/notifications remain atomic with successful changes.
+### Expected success result
+All-or-nothing version-safe updates and usable editable/paginated operator resources.
+### Failure symptoms
+Partial writes, silent stale overwrites, duplicate notifications or cursor/list truncation presented as complete.
+### Rollback consideration
+Disable bulk UI/route if needed, retain work-item data and activity; do not undo successful business transitions automatically.

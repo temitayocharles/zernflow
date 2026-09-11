@@ -1,3 +1,4 @@
+import { Pagination } from "@/components/product/pagination";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getWorkspace } from "@/lib/workspace";
@@ -9,20 +10,34 @@ import {
 } from "@/lib/product/config-contracts";
 export default async function Configuration({
   params,
+  searchParams,
 }: {
   params: Promise<{ resource: string }>;
+  searchParams: Promise<{ page?: string; q?: string }>;
 }) {
   const { resource } = await params;
   if (!configResource(resource) || resource === "editorial_variants")
     notFound();
   const { supabase, workspace, role } = await getWorkspace();
   const form = configurationForms[resource];
-  const { data, error } = await supabase
+  const search = await searchParams;
+  const page = Math.max(
+    0,
+    Math.min(10000, Math.floor(Number(search.page) || 0)),
+  );
+  let query = supabase
     .from(resource)
-    .select()
+    .select("*", { count: "exact" })
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .order("id")
+    .range(page * 50, page * 50 + 49);
+  if (search.q)
+    query = query.ilike(
+      "name",
+      `%${search.q.slice(0, 100).replace(/[%_\\]/g, "\\$&")}%`,
+    );
+  const { data, error, count } = await query;
   return (
     <main className="space-y-5 overflow-auto p-6">
       <h1 className="text-2xl font-semibold">{form.title}</h1>
@@ -51,7 +66,22 @@ export default async function Configuration({
               Test retrieval and inspect citations
             </Link>
           )}
-          <p className="text-xs text-muted-foreground">Latest 100 records</p>
+          <form className="flex gap-2">
+            <label className="sr-only" htmlFor="configuration-search">
+              Search names
+            </label>
+            <input
+              id="configuration-search"
+              name="q"
+              defaultValue={search.q}
+              placeholder="Search names"
+              className="rounded border border-border bg-background p-2"
+            />
+            <button className="rounded border border-border p-2 text-sm">
+              Search
+            </button>
+          </form>
+          <Pagination page={page} total={count ?? 0} search={search.q} />
           {data?.map((item) => (
             <Link
               key={item.id}

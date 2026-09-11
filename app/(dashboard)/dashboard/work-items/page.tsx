@@ -1,3 +1,4 @@
+import { BulkWorkActions } from "@/components/product/bulk-work-actions";
 import Link from "next/link";
 import { getWorkspace } from "@/lib/workspace";
 import { RecordForm } from "@/components/product/record-form";
@@ -122,6 +123,23 @@ export default async function WorkItems({
           redirectBase="/dashboard/work-items"
         />
       </details>
+      <details className="rounded-xl border border-border p-4">
+        <summary>Edit queues</summary>
+        <div className="mt-3 space-y-3">
+          {queues.data?.map((queue) => (
+            <RecordForm
+              key={`${queue.id}:${queue.version}`}
+              record={queue}
+              fields={[
+                { key: "name", label: "Queue name", required: true },
+                { key: "description", label: "Description", type: "textarea" },
+              ]}
+              endpoint="/api/v1/work-queues"
+              redirectBase="/dashboard/work-items"
+            />
+          ))}
+        </div>
+      </details>
       <form className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
           Search
@@ -185,6 +203,7 @@ export default async function WorkItems({
         {items.count} matches · Showing page {page + 1} (50 per page, including
         Kanban).
       </p>
+      <BulkWorkActions items={items.data ?? []} />
       {s.view === "kanban" ? (
         <div className="grid gap-4 lg:grid-cols-5">
           {workStatuses.map((status) => (

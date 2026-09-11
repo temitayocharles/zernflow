@@ -21,11 +21,7 @@ export type ConversationStatus = "open" | "closed" | "snoozed";
 export type MessageDirection = "inbound" | "outbound";
 export type MessageStatus = "pending" | "sent" | "delivered" | "failed";
 export type BroadcastStatus =
-  | "draft"
-  | "scheduled"
-  | "sending"
-  | "completed"
-  | "cancelled";
+  "draft" | "scheduled" | "sending" | "completed" | "cancelled";
 export type JobStatus = "pending" | "processing" | "completed" | "failed";
 export type TriggerType =
   | "keyword"
@@ -35,10 +31,7 @@ export type TriggerType =
   | "default"
   | "comment_keyword";
 export type FlowSessionStatus =
-  | "active"
-  | "completed"
-  | "expired"
-  | "cancelled";
+  "active" | "completed" | "expired" | "cancelled";
 export type NodeType =
   | "trigger"
   | "sendMessage"
@@ -61,10 +54,7 @@ export type NodeType =
 
 export type SequenceStatus = "draft" | "active" | "paused";
 export type SequenceEnrollmentStatus =
-  | "active"
-  | "completed"
-  | "cancelled"
-  | "failed";
+  "active" | "completed" | "cancelled" | "failed";
 
 export interface SequenceStep {
   type: "message" | "delay";
@@ -1124,8 +1114,15 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      workspace_operator_directory: {Args:{p_workspace_id:string};Returns:{user_id:string;display_name:string;role:string}[]};
-      operator_metrics: { Args:{p_workspace_id:string}; Returns:Json };
+      bulk_update_work_items: {
+        Args: { p_workspace_id: string; p_changes: Json };
+        Returns: number;
+      };
+      workspace_operator_directory: {
+        Args: { p_workspace_id: string };
+        Returns: { user_id: string; display_name: string; role: string }[];
+      };
+      operator_metrics: { Args: { p_workspace_id: string }; Returns: Json };
       increment_unread: {
         Args: {
           conv_id: string;

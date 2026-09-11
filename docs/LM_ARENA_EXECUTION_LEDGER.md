@@ -40,7 +40,7 @@
 - Live smoke not run: requires credentials and writes to hardcoded remote entities.
 ## Resume From Here
 Exact next implementation action:
-Add automated browser/component tests for new product form error/conflict flows and inbox pagination/selection races using test fixtures only. Finish remaining repository-side UX gaps (canned-reply editing, queue editing, full source/config pagination and safe bulk work updates) before live acceptance. External adapter enablement remains separate in the handoff.
+Complete reusable approval-queue and autonomy-policy presentation state machines (with execution explicitly unavailable until scoped Gateway contracts are verified), then audit new source/API boundaries and update migration/source-of-truth/PR validation evidence. Do not conflate DOM fixtures with live acceptance.
 
 ### Connector slice validation
 - `npm run typecheck`: passed.
@@ -122,3 +122,9 @@ Add automated browser/component tests for new product form error/conflict flows 
 - Mobile navigation uses native modal-dialog focus handling; desktop navigation remains persistent and independently scrollable. CRM/contact custom-field query corrected to use actual `type` column.
 - Hardened browser session expiry, notification internal links and metrics shape validation. Added CRM API tests for selected-workspace filters, auth, forged tenant fields and optimistic conflicts; added recipient isolation/profile identity/directory SQL cases.
 - Formatted all new product modules for reviewability. Full test suite: 241 / 35 files; production build and typecheck pass. Entire SQL history through 00026 passes actual PostgreSQL fixture execution.
+
+## Atomic bulk work and interaction validation
+- Migration 00027 provides membership-scoped, version-checked bulk status/priority updates (1–50 selected items) in one PostgreSQL transaction, with stable row lock order and rollback if any item is stale/inaccessible or any transition fails.
+- Added explicit confirmation bulk UI for the current work-item page, canned-reply editing, queue editing and paginated configuration/notification/template lists. Removed ineffective name search from profile view.
+- Added React DOM interaction tests (test-only jsdom/Testing Library): failed/stale saves retain edits and never navigate as success, out-of-page references remain selected, inbox ignores late superseded responses, history pages deduplicate, failed reads expose working retry.
+- LOCAL VALIDATION: 257 tests / 38 files; complete migrations 00001–00027 execute in PostgreSQL test fixture; typecheck/lint/Node 24 build pass. DOM tests are not live-browser/provider certification.
