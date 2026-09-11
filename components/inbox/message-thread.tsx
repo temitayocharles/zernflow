@@ -196,7 +196,7 @@ export function MessageThread({
               `/api/v1/messages?conversationId=${conversation.id}`
             );
             if (res.ok) {
-              const freshMessages = await res.json();
+              const freshMessages = mergeMessagePages([], await res.json(), conversation.id);
               setMessages((prev) => {
                 return mergeMessagePages(freshMessages, prev, conversation.id);
               });

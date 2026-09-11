@@ -28,12 +28,12 @@ Revert application changes if needed; retain existing Gateway credentials and du
 BLOCKED
 ### Repository evidence
 Commit: baseline `88d647b`
-Files: `.forgejo/workflows/ci.yml` (inspect actual workflow filenames), `scripts/smoke-test.mjs`, `supabase/migrations/`
+Files: `.forgejo/workflows/ci.yml`, `scripts/smoke-test.mjs`, `scripts/smoke-config.mjs`, `docs/LOCAL_VALIDATION.md`, `supabase/migrations/`
 Tests: local Vitest suite available; live smoke not executed.
 ### External system
 Supabase / Northflank / Agent Social Gateway
 ### Exact action required
-Provision disposable tenant-scoped runtime with migrations 00001–00020; use Node 24/npm 11. Replace unsafe hardcoded smoke target inputs before running the legacy smoke script. Production certification requires live provider acceptance, not only mocked tests.
+Provision disposable tenant-scoped runtime with migrations 00001–00020; use Node 24/npm 11. The smoke script now requires explicit disposable targets and write acknowledgement; configure them per `docs/LOCAL_VALIDATION.md`. It certifies only the legacy webhook path, not Gateway delivery. Production certification requires live provider acceptance, not only mocked tests.
 ### Environment variables / secret names
 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET
 ### Endpoint or callback expected
@@ -46,3 +46,28 @@ Full local checks and live acceptance independently recorded with deployment rev
 Missing migration objects, authentication failures, provider failures, or cross-tenant data.
 ### Rollback consideration
 Do not reset any production database or delete durable Gateway state.
+
+
+## ITEM: Inbox browser and pagination acceptance
+### Code status
+COMPLETE
+### Repository evidence
+Commit: `8bad5ba` and subsequent hardening checkpoint on the active branch.
+Files: `app/(dashboard)/dashboard/inbox/inbox-view.tsx`, `components/inbox/message-thread.tsx`, `lib/inbox/`, `app/api/v1/messages/route.ts`
+Tests: message query, page merge, API route tests; full suite 165 passing tests.
+### External system
+Supabase / Agent Social Gateway / browser
+### Exact action required
+With an isolated authenticated tenant, populate a Gateway conversation with more than 50 messages, then test page loading, realtime arrivals and optimistic sends while switching conversations rapidly. Confirm page cursors from the real Gateway contract advance as expected.
+### Environment variables / secret names
+Existing Supabase and SOCIAL_GATEWAY_* configuration; no new provider secrets.
+### Endpoint or callback expected
+`GET /api/v1/messages?conversationId=<local-id>&paginated=true&limit=50&cursor=<opaque>`
+### Verification procedure
+Confirm older pages appear chronologically without duplicates or scroll jumps. Verify interrupted reads never show one conversation's messages in another. Disconnect Gateway and confirm retry UI, unchanged unread state on failed reads, and no false delivery success.
+### Expected success result
+History, pending sends and workspace boundaries remain intact under paging and realtime updates.
+### Failure symptoms
+Repeated cursors, missing history, cross-conversation messages, lost pending sends, or unread state cleared after failed reads.
+### Rollback consideration
+Revert UI paging independently. Default API callers still receive the legacy array response; no database migration is involved.
