@@ -2,14 +2,14 @@ begin;
 create function customer_profile_identity_guard() returns trigger language plpgsql set search_path=public as $$
 begin if new.contact_id<>old.contact_id then raise exception 'customer profile contact identity is immutable' using errcode='23514';end if;return new;end $$;
 create trigger profile_identity_guard before update on customer_profiles for each row execute function customer_profile_identity_guard();
--- Member names are available only inside the explicitly authorized workspace.
--- No email, credentials, or unrelated Auth metadata is returned.
+-- The operator directory intentionally avoids auth.users metadata. It exposes only
+-- workspace membership identity, a deterministic non-sensitive label, and role.
 create function workspace_operator_directory(p_workspace_id uuid) returns table(user_id uuid,display_name text,role text)
 language plpgsql stable security definer set search_path=public as $$
 begin
  if not is_workspace_member(p_workspace_id) then raise exception 'workspace membership required' using errcode='42501';end if;
- return query select wm.user_id,left(coalesce(nullif(u.raw_user_meta_data->>'full_name',''),nullif(u.raw_user_meta_data->>'name',''),'Workspace member'),200),wm.role
- from workspace_members wm join auth.users u on u.id=wm.user_id where wm.workspace_id=p_workspace_id order by wm.created_at,wm.user_id limit 500;
+ return query select wm.user_id,'Workspace member '||left(wm.user_id::text,8),wm.role
+ from workspace_members wm where wm.workspace_id=p_workspace_id order by wm.created_at,wm.user_id limit 500;
 end $$;
 revoke all on function workspace_operator_directory(uuid) from public;
 grant execute on function workspace_operator_directory(uuid) to authenticated;
