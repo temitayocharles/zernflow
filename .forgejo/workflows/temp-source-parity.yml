@@ -1,0 +1,69 @@
+name: TEMP immutable source parity proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ["forgejo-general"]
+    container:
+      image: node:24-bookworm
+    steps:
+      - name: Fetch target and immutable GitHub source
+        shell: sh
+        run: |
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+          git config --global --add safe.directory "$PWD"
+          git init .
+          git remote add forgejo "${FORGEJO_SERVER_URL:-${GITHUB_SERVER_URL}}/${FORGEJO_REPOSITORY:-${GITHUB_REPOSITORY}}.git"
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "$token"
+          git -c http.extraHeader="Authorization: token ${token}" fetch --depth=200 forgejo main sync/lm-arena-zernflow-rest-20260911
+          git checkout -B target FETCH_HEAD
+          git remote add arena https://github.com/temitayocharles/zernflow.git
+          git fetch --depth=200 arena 88d647bef3754c4af102bbd8739b57aca3053eab b45ea5b5b7e731dfabd0af530e7aec12ddb3a1d9
+
+      - name: Prove exact 132-path parity
+        shell: sh
+        run: |
+          set -eu
+          BASE='88d647bef3754c4af102bbd8739b57aca3053eab'
+          SOURCE='b45ea5b5b7e731dfabd0af530e7aec12ddb3a1d9'
+          TARGET='target'
+          TEMP='.forgejo/workflows/temp-source-parity.yml'
+
+          git diff --name-only "$BASE" "$SOURCE" | LC_ALL=C sort > /tmp/source-paths
+          source_count="$(wc -l < /tmp/source-paths | tr -d ' ')"
+          echo "SOURCE_CHANGED_PATHS=$source_count"
+          test "$source_count" = '132'
+
+          git diff --name-only "$BASE" "$TARGET" | grep -v -F -x "$TEMP" | LC_ALL=C sort > /tmp/target-paths || true
+          target_count="$(wc -l < /tmp/target-paths | tr -d ' ')"
+          echo "TARGET_CHANGED_PATHS_EXCLUDING_TEMP=$target_count"
+          test "$target_count" = '132'
+
+          if ! diff -u /tmp/source-paths /tmp/target-paths; then
+            echo 'FAIL: changed-path manifests differ'
+            exit 1
+          fi
+
+          mismatches=0
+          while IFS= read -r path; do
+            src="$(git ls-tree "$SOURCE" -- "$path")"
+            tgt="$(git ls-tree "$TARGET" -- "$path")"
+            if [ "$src" != "$tgt" ]; then
+              echo "MISMATCH $path"
+              echo "  source: $src"
+              echo "  target: $tgt"
+              mismatches=$((mismatches + 1))
+            fi
+          done < /tmp/source-paths
+
+          echo "MISMATCHES=$mismatches"
+          test "$mismatches" = '0'
+          echo 'PARITY=132/132'
