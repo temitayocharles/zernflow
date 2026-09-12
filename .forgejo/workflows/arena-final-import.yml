@@ -1,0 +1,55 @@
+name: Arena Final Exact Import
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-final-files:
+    runs-on: ["forgejo-general"]
+    container:
+      image: node:24-bookworm
+    steps:
+      - name: Fetch isolated import branch
+        shell: sh
+        run: |
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends git curl ca-certificates
+          git config --global --add safe.directory "$PWD"
+          git init .
+          git remote add origin "${FORGEJO_SERVER_URL:-${GITHUB_SERVER_URL}}/${FORGEJO_REPOSITORY:-${GITHUB_REPOSITORY}}.git"
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "$token"
+          branch='sync/lm-arena-zernflow-rest-20260911'
+          git -c http.extraHeader="Authorization: token ${token}" fetch --depth=1 origin "refs/heads/${branch}"
+          git checkout -B "$branch" FETCH_HEAD
+
+      - name: Import and verify exact Arena blobs
+        shell: sh
+        run: |
+          set -eu
+          base='https://raw.githubusercontent.com/temitayocharles/zernflow/arena/01a091fb-zernflow'
+          curl -fsSL "$base/app/api/cron/jobs/route.ts" -o app/api/cron/jobs/route.ts
+          curl -fsSL "$base/lib/types/database.ts" -o lib/types/database.ts
+          curl -fsSL "$base/package-lock.json" -o package-lock.json
+
+          test "$(git hash-object app/api/cron/jobs/route.ts)" = '9daeee3227ed5dffc49b1a13990315e955ea1ea1'
+          test "$(git hash-object lib/types/database.ts)" = 'e3ae2c6f158ac8b686bf18303051bed781d5623c'
+          test "$(git hash-object package-lock.json)" = 'b9bb517b3b7f6223bbd54a96023ad60db88f737c'
+
+      - name: Commit exact payloads to isolated branch
+        shell: sh
+        run: |
+          set -eu
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          test -n "$token"
+          branch='sync/lm-arena-zernflow-rest-20260911'
+          git config user.name 'Arena Exact Import'
+          git config user.email 'arena-import@local.invalid'
+          git add app/api/cron/jobs/route.ts lib/types/database.ts package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'sync: import final exact Arena payloads'
+          git -c http.extraHeader="Authorization: token ${token}" push origin "HEAD:refs/heads/${branch}"
