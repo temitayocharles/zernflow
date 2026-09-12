@@ -3,11 +3,7 @@ import { SocialGatewayError } from "@/lib/social-gateway/client";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 import { getWorkspace } from "@/lib/workspace";
 
-type ConnectablePlatform = "facebook" | "instagram";
-
-function isConnectablePlatform(value: unknown): value is ConnectablePlatform {
-  return value === "facebook" || value === "instagram";
-}
+import { isOAuthPlatform, canStartOnboarding } from "@/lib/connectors/registry";
 
 function callbackUrl(request: Request): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
@@ -43,7 +39,7 @@ export async function POST(request: Request) {
     typeof body === "object" && body !== null && "platform" in body
       ? (body as { platform?: unknown }).platform
       : undefined;
-  if (!isConnectablePlatform(platform)) {
+  if (!isOAuthPlatform(platform)) {
     return NextResponse.json(
       { code: "unsupported_platform", error: "Only Facebook and Instagram are supported" },
       { status: 422 },
@@ -53,7 +49,7 @@ export async function POST(request: Request) {
   try {
     const gateway = requireSocialGatewayClient();
     const readiness = await gateway.getProviderReadiness("meta");
-    if (!readiness.configured || !readiness.platforms.includes(platform)) {
+    if (!canStartOnboarding(platform, readiness)) {
       return NextResponse.json(
         {
           code: "provider_onboarding_not_configured",

@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vitest";
+import { parseConfiguration } from "./config-contracts";
+describe("product integration configuration", () => {
+  it("rejects imaginary provider success and forged reviewers", () => {
+    expect(() =>
+      parseConfiguration(
+        "editorial_drafts",
+        { version: 1, state: "published" },
+        true,
+      ),
+    ).toThrow();
+    expect(() =>
+      parseConfiguration(
+        "editorial_drafts",
+        { version: 1, reviewed_by: "forged" },
+        true,
+      ),
+    ).toThrow();
+  });
+  it("validates identity and knowledge configuration", () => {
+    expect(() =>
+      parseConfiguration("mailbox_identities", {
+        name: "Support",
+        address: "bad",
+      }),
+    ).toThrow();
+    expect(() =>
+      parseConfiguration("knowledge_sources", {
+        name: "Source",
+        source_ref: "ref",
+        enabled: "yes",
+      }),
+    ).toThrow();
+    expect(
+      parseConfiguration("knowledge_sources", {
+        name: "Source",
+        source_ref: "ref",
+        enabled: false,
+      }),
+    ).toMatchObject({ enabled: false });
+  });
+  it("bounds variant media and verifies timezone", () => {
+    expect(() =>
+      parseConfiguration(
+        "editorial_variants",
+        { version: 1, media_refs: Array(21).fill("x") },
+        true,
+      ),
+    ).toThrow();
+    expect(() =>
+      parseConfiguration(
+        "editorial_drafts",
+        { version: 1, timezone: "not-a-zone" },
+        true,
+      ),
+    ).toThrow();
+  });
+});

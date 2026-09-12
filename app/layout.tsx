@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import "@fontsource-variable/inter";
 import { connection } from "next/server";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
 const appUrl = (
   process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
 ).replace(/\/$/, "");
@@ -84,7 +83,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body style={{ fontFamily: '"Inter Variable", Arial, sans-serif' }}>{children}</body>
     </html>
   );
 }

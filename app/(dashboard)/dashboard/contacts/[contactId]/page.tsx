@@ -1,3 +1,4 @@
+import {Customer360} from "@/components/product/customer-360";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getWorkspace } from "@/lib/workspace";
@@ -39,7 +40,7 @@ export default async function ContactDetailPage({
         .order("last_message_at", { ascending: false }),
       supabase
         .from("contact_custom_fields")
-        .select("value, custom_field_definitions(name, slug, field_type)")
+        .select("value, custom_field_definitions(name, slug, type)")
         .eq("contact_id", contactId),
     ]);
 
@@ -254,6 +255,7 @@ export default async function ContactDetailPage({
           )}
         </div>
       </div>
+      <Customer360 contactId={contactId}/>
     </div>
   );
 }

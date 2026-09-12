@@ -1,0 +1,39 @@
+import Link from "next/link";
+import { getWorkspace } from "@/lib/workspace";
+import { KnowledgeRetrieval } from "@/components/product/knowledge-retrieval";
+export default async function Knowledge() {
+  const { workspace, supabase } = await getWorkspace();
+  const { data, error } = await supabase
+    .from("knowledge_sources")
+    .select("id,name")
+    .eq("workspace_id", workspace.id)
+    .eq("enabled", true)
+    .order("name")
+    .limit(200);
+  const configured = !!(
+    process.env.KNOWLEDGE_RETRIEVAL_URL && process.env.KNOWLEDGE_API_TOKEN
+  );
+  return (
+    <main className="mx-auto w-full max-w-4xl space-y-5 overflow-auto p-6">
+      <h1 className="text-2xl font-semibold">Knowledge context</h1>
+      <Link
+        className="text-sm underline"
+        href="/dashboard/configuration/knowledge_sources"
+      >
+        Configure sources
+      </Link>
+      <p className="text-sm text-muted-foreground">
+        {configured
+          ? "Retrieval endpoint configured; live readiness is checked on request."
+          : "Retrieval endpoint not configured. No indexing or retrieval success is claimed."}
+      </p>
+      {error ? (
+        <p role="alert">
+          Knowledge sources unavailable. Apply migration 00024.
+        </p>
+      ) : (
+        <KnowledgeRetrieval sources={data ?? []} />
+      )}
+    </main>
+  );
+}

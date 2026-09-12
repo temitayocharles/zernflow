@@ -1,0 +1,136 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { EditorialVariant } from "@/lib/product/types";
+function VariantForm({
+  draftId,
+  channels,
+  variant,
+}: {
+  draftId: string;
+  channels: { id: string; label: string }[];
+  variant?: EditorialVariant;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="space-y-2 rounded border border-border p-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const form = new FormData(e.currentTarget);
+        setBusy(true);
+        setError(null);
+        try {
+          const r = await fetch(
+            `/api/v1/configuration/editorial_variants${variant ? `/${variant.id}` : ""}`,
+            {
+              method: variant ? "PATCH" : "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...(variant
+                  ? { version: variant.version }
+                  : { draft_id: draftId, channel_id: form.get("channel_id") }),
+                body: form.get("body"),
+                media_refs: String(form.get("media_refs") ?? "")
+                  .split("\n")
+                  .map((v) => v.trim())
+                  .filter(Boolean),
+              }),
+            },
+          );
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error);
+          router.refresh();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Unable to save variant");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="block text-sm">
+        Channel
+        <select
+          name="channel_id"
+          required
+          disabled={!!variant}
+          defaultValue={variant?.channel_id}
+          className="ml-2 rounded border border-border bg-background p-2"
+        >
+          {channels.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block text-sm">
+        Channel content
+        <textarea
+          name="body"
+          required
+          maxLength={100000}
+          defaultValue={variant?.body}
+          className="mt-1 w-full rounded border border-border bg-background p-2"
+        />
+      </label>
+      <label className="block text-sm">
+        Existing media references (one per line, maximum 20; no uploads)
+        <textarea
+          name="media_refs"
+          defaultValue={variant?.media_refs.join("\n")}
+          className="mt-1 w-full rounded border border-border bg-background p-2"
+        />
+      </label>
+      <button
+        disabled={busy || !channels.length}
+        className="rounded border border-border p-2 text-sm disabled:opacity-50"
+      >
+        {busy ? "Saving…" : variant ? "Save variant" : "Add channel variant"}
+      </button>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+export function EditorialVariants({
+  draftId,
+  channels,
+  variants,
+}: {
+  draftId: string;
+  channels: { id: string; label: string }[];
+  variants: EditorialVariant[];
+}) {
+  return (
+    <section className="space-y-3">
+      <h2 className="font-semibold">Channel variants & media references</h2>
+      <p className="text-sm text-muted-foreground">
+        Editing a variant returns the draft to review. These are local plans,
+        not provider operations or upload claims.
+      </p>
+      {variants.map((v) => (
+        <VariantForm
+          key={`${v.id}:${v.version}`}
+          draftId={draftId}
+          channels={channels}
+          variant={v}
+        />
+      ))}
+      <details>
+        <summary className="text-sm">Add a channel variant</summary>
+        <VariantForm
+          draftId={draftId}
+          channels={channels.filter(
+            (c) => !variants.some((v) => v.channel_id === c.id),
+          )}
+        />
+      </details>
+    </section>
+  );
+}

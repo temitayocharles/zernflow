@@ -17,7 +17,7 @@ human handoff, sequences and scheduled job execution
 provider accounts, OAuth, Vault credentials, normalized events,
 authoritative conversations/messages, durable operations, REST and MCP
             |
- Postiz and direct provider APIs
+ Maintained connectors and official provider APIs
             |
 Facebook, Instagram, WhatsApp, Telegram, LinkedIn,
 TikTok and other supported channels
@@ -40,11 +40,22 @@ Agent Social Gateway owns:
 - normalized inbound events and authoritative messages and conversations;
 - durable outbound operations, retries, reconciliation and dead letters;
 - provider policy, approvals, agent identities, REST and MCP execution contracts;
-- Postiz integration for publishing and scheduling where Postiz is the best downstream engine.
+- Transitional Postiz compatibility only until replacement publishing/calendar/media paths are accepted; no new strategic Postiz dependencies.
 
 Zernio is an optional compatibility provider only. Legacy `@zernio/node` access is disabled unless the server-only environment value `ENABLE_LEGACY_ZERNIO=true` is set exactly. New work must use Agent Social Gateway.
 
 ## Current product surface
+
+The continuation branch adds tenant-isolated CRM companies/profiles/opportunities,
+reusable work items and queues with SLA presentation, internal notes/mentions,
+recipient notifications, canned replies, editorial planning, mailbox identity
+configuration, external knowledge retrieval, and operator analytics. Apply
+migrations **00021–00029** for these surfaces. See
+`docs/PRODUCT_INTEGRATION_SEAMS.md` for explicit provider/runtime boundaries and
+`docs/LM_ARENA_EXECUTION_LEDGER.md` for implementation/validation evidence.
+Editorial approval does not publish content; mailbox configuration does not
+connect an email provider; knowledge source configuration does not index it.
+
 
 - visual flow builder with trigger, message, condition, delay, AI, HTTP, sequence, subscription, human takeover and routing nodes;
 - unified inbox backed by gateway conversation reads and local contact/conversation projection;
@@ -57,7 +68,7 @@ Zernio is an optional compatibility provider only. Legacy `@zernio/node` access 
 - analytics events and operator-visible processing state;
 - bounded legacy Zernio fallback for migration-only paths.
 
-Provider availability remains capability-driven. An action is exposed only when the official provider API, Postiz or an explicitly configured compatibility provider supports it.
+Provider availability remains capability-driven. An action is exposed only when the configured Gateway connector reports support and live acceptance has confirmed it. A local channel card alone is not evidence of support.
 
 ## Prerequisites
 
@@ -76,7 +87,6 @@ Postiz is configured behind Agent Social Gateway, not in the browser and not in 
 ```bash
 git clone https://forgejo.tca-infraforge.site/temitayocharles/zernflow.git
 cd zernflow
-git checkout feature/foundation-gateway-seam
 npm ci
 cp .env.example .env.local
 ```
@@ -105,7 +115,7 @@ Never prefix gateway credentials, the service-role key, cron secret or webhook s
 
 ## Database migrations
 
-The numbered files in `supabase/migrations/` are the only migration source of truth. Apply every numbered migration in lexical order, currently `00001` through `00020`.
+The numbered files in `supabase/migrations/` are the only migration source of truth. Apply every numbered migration in lexical order, currently `00001` through `00029`.
 
 For a linked Supabase project, use the Supabase CLI migration workflow. For a manual installation, execute each numbered SQL file in order and record the applied revision outside the application database if your deployment system does not do so automatically.
 
@@ -131,6 +141,8 @@ The canonical Forgejo CI uses Node 24 and requires all of the following:
 - the Vitest suite;
 - a successful Next.js production build.
 
+See `docs/LOCAL_VALIDATION.md` for offline font builds and explicit, disposable-target legacy smoke configuration.
+
 ## Gateway event delivery
 
 Configure an active Agent Social Gateway delivery webhook endpoint for:
@@ -152,7 +164,7 @@ GET /api/cron/jobs
 GET /api/cron/sequences
 ```
 
-Use a cadence appropriate to the deployment platform. The job route performs claim compare-and-swap, stale-claim recovery, bounded retries and terminal settlement for delayed flows, broadcasts and queued gateway events.
+Use a cadence appropriate to the deployment platform. The job route performs claim compare-and-swap, stale-claim recovery, bounded retries and terminal settlement for delayed flows, broadcasts and queued gateway events. With migrations 00028–00029 it also performs bounded, deduplicated SLA notification scans; inspect the `slaNotifications` result for failures or more pending batches.
 
 ## Security model
 
