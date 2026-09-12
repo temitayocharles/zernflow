@@ -1,0 +1,42 @@
+name: TEMP lockfile parity repair
+
+on:
+  workflow_dispatch:
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout import branch
+        uses: actions/checkout@v4
+        with:
+          ref: sync/lm-arena-zernflow-rest-20260911
+          fetch-depth: 0
+
+      - name: Replace lockfile from immutable Arena commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA='b45ea5b5b7e731dfabd0af530e7aec12ddb3a1d9'
+          EXPECTED_BLOB='b9bb517b3b7f6223bbd54a96023ad60db88f737c'
+          EXPECTED_SIZE='328068'
+          URL="https://raw.githubusercontent.com/temitayocharles/zernflow/${SOURCE_SHA}/package-lock.json"
+          curl --fail --silent --show-error --location "$URL" --output /tmp/package-lock.json
+          test "$(wc -c < /tmp/package-lock.json | tr -d ' ')" = "$EXPECTED_SIZE"
+          test "$(git hash-object /tmp/package-lock.json)" = "$EXPECTED_BLOB"
+          cp /tmp/package-lock.json package-lock.json
+          test "$(git hash-object package-lock.json)" = "$EXPECTED_BLOB"
+
+      - name: Commit exact lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package-lock.json; then
+            echo 'package-lock.json already exact'
+            exit 0
+          fi
+          git config user.name 'Forgejo Actions'
+          git config user.email 'actions@tayoca.com'
+          git add package-lock.json
+          git commit -m 'fix(sync): restore exact Arena lockfile'
+          git push origin HEAD:sync/lm-arena-zernflow-rest-20260911
