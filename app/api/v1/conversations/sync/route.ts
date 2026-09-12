@@ -28,7 +28,10 @@ type WorkspaceSupabase = Awaited<ReturnType<typeof getWorkspace>>["supabase"];
 
 class ConversationSyncInputError extends Error {}
 
-function parseSyncInput(request: NextRequest): { limit: number; cursor?: string } {
+function parseSyncInput(request: NextRequest): {
+  limit: number;
+  cursor?: string;
+} {
   const rawLimit = request.nextUrl.searchParams.get("limit");
   const rawCursor = request.nextUrl.searchParams.get("cursor")?.trim();
   const limit = rawLimit === null ? DEFAULT_SYNC_LIMIT : Number(rawLimit);
@@ -76,7 +79,9 @@ function gatewayFailure(error: unknown): NextResponse {
   );
 }
 
-function emptyDetail(summary: GatewayConversationSummary): GatewayConversationDetail {
+function emptyDetail(
+  summary: GatewayConversationSummary,
+): GatewayConversationDetail {
   return {
     conversation: summary,
     participants: [],
@@ -111,12 +116,13 @@ async function resolveContactId(
     return item.existingContactId;
   }
 
-  const { data: existingRelation, error: existingRelationError } = await supabase
-    .from("contact_channels")
-    .select("contact_id")
-    .eq("channel_id", item.channelId)
-    .eq("platform_sender_id", item.participant.external_participant_ref)
-    .maybeSingle();
+  const { data: existingRelation, error: existingRelationError } =
+    await supabase
+      .from("contact_channels")
+      .select("contact_id")
+      .eq("channel_id", item.channelId)
+      .eq("platform_sender_id", item.participant.external_participant_ref)
+      .maybeSingle();
   if (existingRelationError) throw new Error(existingRelationError.message);
   if (existingRelation) return existingRelation.contact_id;
 
@@ -154,12 +160,14 @@ async function resolveContactId(
     throw new Error(contactError?.message ?? "Failed to create contact");
   }
 
-  const { error: relationError } = await supabase.from("contact_channels").insert({
-    contact_id: contact.id,
-    channel_id: item.channelId,
-    platform_sender_id: item.participant.external_participant_ref,
-    platform_username: username,
-  });
+  const { error: relationError } = await supabase
+    .from("contact_channels")
+    .insert({
+      contact_id: contact.id,
+      channel_id: item.channelId,
+      platform_sender_id: item.participant.external_participant_ref,
+      platform_username: username,
+    });
 
   if (!relationError) return contact.id;
 
@@ -179,7 +187,8 @@ async function resolveContactId(
     .single();
   if (racedRelationError || !racedRelation) {
     throw new Error(
-      racedRelationError?.message ?? "Failed to resolve concurrent contact projection",
+      racedRelationError?.message ??
+        "Failed to resolve concurrent contact projection",
     );
   }
   return racedRelation.contact_id;
@@ -221,25 +230,28 @@ export async function POST(request: NextRequest) {
       channelRows.map((channel) => channel.late_account_id),
     );
 
-    const [page, conversationsResult, contactChannelsResult] = await Promise.all([
-      gateway.listConversations(input),
-      supabase
-        .from("conversations")
-        .select(
-          "id, late_conversation_id, channel_id, contact_id, last_message_at, last_message_preview",
-        )
-        .eq("workspace_id", workspace.id)
-        .not("late_conversation_id", "is", null),
-      channelIds.length > 0
-        ? supabase
-            .from("contact_channels")
-            .select("channel_id, platform_sender_id, contact_id")
-            .in("channel_id", channelIds)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
+    const [page, conversationsResult, contactChannelsResult] =
+      await Promise.all([
+        gateway.listConversations(input),
+        supabase
+          .from("conversations")
+          .select(
+            "id, late_conversation_id, channel_id, contact_id, last_message_at, last_message_preview",
+          )
+          .eq("workspace_id", workspace.id)
+          .not("late_conversation_id", "is", null),
+        channelIds.length > 0
+          ? supabase
+              .from("contact_channels")
+              .select("channel_id, platform_sender_id, contact_id")
+              .in("channel_id", channelIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-    if (conversationsResult.error) throw new Error(conversationsResult.error.message);
-    if (contactChannelsResult.error) throw new Error(contactChannelsResult.error.message);
+    if (conversationsResult.error)
+      throw new Error(conversationsResult.error.message);
+    if (contactChannelsResult.error)
+      throw new Error(contactChannelsResult.error.message);
 
     const existingConversationIds = new Set(
       (conversationsResult.data ?? []).map(
@@ -285,24 +297,24 @@ export async function POST(request: NextRequest) {
       })) as ExistingContactChannelProjection[],
     );
 
-    await mapWithConcurrency(plan.updates, WRITE_CONCURRENCY, async (update) => {
-      const { error } = await supabase
-        .from("conversations")
-        .update({
-          last_message_at: update.lastMessageAt,
-          last_message_preview: update.lastMessagePreview,
-        })
-        .eq("id", update.conversationId)
-        .eq("workspace_id", workspace.id);
-      if (error) throw new Error(error.message);
-    });
+    await mapWithConcurrency(
+      plan.updates,
+      WRITE_CONCURRENCY,
+      async (update) => {
+        const { error } = await supabase
+          .from("conversations")
+          .update({
+            last_message_at: update.lastMessageAt,
+            last_message_preview: update.lastMessagePreview,
+          })
+          .eq("id", update.conversationId)
+          .eq("workspace_id", workspace.id);
+        if (error) throw new Error(error.message);
+      },
+    );
 
     await mapWithConcurrency(plan.creates, WRITE_CONCURRENCY, async (item) => {
-      const contactId = await resolveContactId(
-        supabase,
-        workspace.id,
-        item,
-      );
+      const contactId = await resolveContactId(supabase, workspace.id, item);
       const { error } = await supabase.from("conversations").upsert(
         {
           workspace_id: workspace.id,
