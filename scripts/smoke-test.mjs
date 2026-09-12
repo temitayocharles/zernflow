@@ -11,20 +11,21 @@
  *
  * Usage:
  *   node scripts/smoke-test.mjs [base-url]
- *   node scripts/smoke-test.mjs https://zernflow.vercel.app
+ *   See docs/LOCAL_VALIDATION.md for required isolated target configuration.
  *   node scripts/smoke-test.mjs http://localhost:3000
  */
 
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
+import { smokeConfig } from "./smoke-config.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 // Load .env manually (no dotenv dependency)
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const envPath = resolve(__dirname, "../.env");
-for (const line of readFileSync(envPath, "utf8").split("\n")) {
+for (const line of (existsSync(envPath) ? readFileSync(envPath, "utf8") : "").split("\n")) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith("#")) continue;
   const eq = trimmed.indexOf("=");
@@ -34,20 +35,11 @@ for (const line of readFileSync(envPath, "utf8").split("\n")) {
   if (!process.env[key]) process.env[key] = val;
 }
 
-const BASE_URL = process.argv[2] || "https://zernflow.vercel.app";
-const WORKSPACE_ID = "1ed7f49a-79d9-42e5-a79d-0ea9e3b957b1";
-
-// Use the telegram channel (simplest for testing)
-const CHANNEL = {
-  id: "0231f9d7-e6d2-45e4-931b-48543d492c9d",
-  platform: "telegram",
-  late_account_id: "69709fcdc955c6705a96ed84",
-};
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const config = smokeConfig(process.env, process.argv[2]);
+const BASE_URL = config.baseUrl;
+const WORKSPACE_ID = config.workspaceId;
+const CHANNEL = { id: config.channelId, platform: "telegram", late_account_id: config.accountId };
+const supabase = createClient(config.supabaseUrl, config.serviceRoleKey);
 
 // Test IDs for cleanup
 const testFlowId = randomUUID();
@@ -316,6 +308,16 @@ async function main() {
   console.log("========================================\n");
 
   try {
+    // Fail before any writes if the supplied IDs do not describe the same isolated tenant.
+    const { data: channel, error } = await supabase.from("channels")
+      .select("workspace_id, platform, late_account_id")
+      .eq("id", CHANNEL.id).single();
+    if (error || !channel || channel.workspace_id !== WORKSPACE_ID ||
+        channel.platform !== CHANNEL.platform || channel.late_account_id !== CHANNEL.late_account_id) {
+      fail("Smoke channel does not match the configured workspace, platform and account");
+      process.exitCode = 1;
+      return;
+    }
     await setup();
     console.log("");
 
