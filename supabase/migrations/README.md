@@ -7,7 +7,7 @@ Current required range:
 ```text
 00001_initial_schema.sql
 ...
-00020_event_time_inbox_projection.sql
+00029_privileged_rpc_grants.sql
 ```
 
 Do not concatenate the files into an aggregate SQL script and do not selectively copy statements between migrations. Later migrations intentionally alter constraints, policies, indexes and security-definer functions established by earlier files.
@@ -23,7 +23,7 @@ supabase db push
 supabase migration list
 ```
 
-The second `migration list` must show migrations `00001` through `00020` as applied to the remote project.
+The second `migration list` must show migrations `00001` through `00029` as applied to the remote project.
 
 For a disposable local Supabase environment, rebuild from the complete numbered history:
 
@@ -110,3 +110,57 @@ Workspace updates and channel inserts, updates and deletes must be owner-scoped.
 ## Release requirement
 
 A ZernFlow release that includes gateway-backed inbox, sequences, broadcasts or signed gateway webhooks is not production-ready unless the target database has applied migrations `00016` through `00020` in addition to the earlier schema history.
+
+
+## Product-domain migrations 00021–00029
+
+- 00021: companies, customer profiles, opportunities, internal notes, audit.
+- 00022: reusable work items, queues, SLA snapshots and guarded transitions.
+- 00023: conversation notes, mentions, canned replies, recipient notifications.
+- 00024: editorial drafts/variants/approval, external knowledge refs, email identities.
+- 00025: authorized whole-workspace operator metrics.
+- 00026: immutable customer-profile contact identity, scoped teammate directory,
+  member-departure reference cleanup.
+
+Apply in order on an isolated Supabase project before promotion. Existing
+migrations were not rewritten. The automated `lib/product/database.test.ts`
+applies the complete history in PGlite PostgreSQL with Auth/publication fixtures
+and a `uuid_generate_v4()` equivalent; it verifies RLS, composite foreign keys,
+trigger behavior, audit attribution and aggregates, not live Auth/Realtime.
+
+Additional verification:
+
+```sql
+select to_regclass('public.work_items'), to_regclass('public.companies'),
+       to_regclass('public.operator_notifications');
+select to_regprocedure('public.operator_metrics(uuid)'),
+       to_regprocedure('public.workspace_operator_directory(uuid)');
+select tablename, policyname, cmd from pg_policies
+where schemaname='public' and tablename in
+('companies','customer_profiles','deals','work_items','work_queues',
+ 'customer_notes','product_activity','operator_notifications','canned_replies',
+ 'editorial_drafts','editorial_variants','knowledge_sources','mailbox_identities');
+```
+
+Run authorization verification as ordinary authenticated users in two different
+workspaces, not as service role. Audit inserts must be rejected from browser
+credentials; another recipient's notifications must be invisible. Only owner
+may configure knowledge/mailboxes or approve editorial drafts. Test stale
+version conflicts and composite foreign keys from API and direct PostgREST.
+No automatic down migration is provided: retain customer/work records when
+rolling back application code, rather than destructively dropping tables.
+
+- 00027: atomic membership-scoped, version-safe bulk work status/priority updates; no partial writes on conflict.
+
+- 00028: service-only bounded SLA notification scan, reused by the existing jobs cron.
+- 00029: explicit browser-role revocation for worker-only RPCs, including explicit
+  Supabase default grants, while retaining service_role execution. Never roll back
+  by restoring anon/authenticated access to privileged mutation functions.
+
+Privilege verification (all client checks must be false, worker true):
+
+```sql
+select has_function_privilege('authenticated','public.refresh_sla_notifications(timestamptz)','EXECUTE') as client_allowed,
+       has_function_privilege('anon','public.claim_social_gateway_webhook(text,text,text,uuid,jsonb)','EXECUTE') as anon_allowed,
+       has_function_privilege('service_role','public.refresh_sla_notifications(timestamptz)','EXECUTE') as worker_allowed;
+```
