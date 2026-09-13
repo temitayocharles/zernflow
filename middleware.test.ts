@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 describe("cron authentication middleware", () => {
-  it("promotes X-Cron-Secret to the existing Bearer contract for cron routes", async () => {
+  it("promotes and consumes X-Cron-Secret for cron routes", async () => {
     const response = await middleware(
       new NextRequest("https://app.example/api/cron/jobs", {
         headers: { "X-Cron-Secret": "test-cron-secret" },
@@ -31,7 +31,7 @@ describe("cron authentication middleware", () => {
 
     expect(await response.json()).toMatchObject({
       authorization: "Bearer test-cron-secret",
-      cronSecret: "test-cron-secret",
+      cronSecret: null,
     });
   });
 
