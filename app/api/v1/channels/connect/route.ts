@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { SocialGatewayError } from "@/lib/social-gateway/client";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 import { getWorkspace } from "@/lib/workspace";
+import { gatewayBindingViolation } from "@/lib/social-gateway/tenancy";
 
 import { isOAuthPlatform, canStartOnboarding } from "@/lib/connectors/registry";
 
@@ -25,6 +26,9 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
+
+  const bindingViolation = await gatewayBindingViolation(workspace.id);
+  if (bindingViolation) return bindingViolation;
 
   let body: unknown;
   try {
