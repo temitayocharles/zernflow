@@ -1,5 +1,6 @@
 import { getWorkspace } from "@/lib/workspace";
 import { AnalyticsView } from "./analytics-view";
+import { CampaignAttribution } from "@/components/analytics/campaign-attribution";
 
 export default async function AnalyticsPage() {
   const { workspace, supabase } = await getWorkspace();
@@ -153,6 +154,7 @@ export default async function AnalyticsPage() {
         contactGrowth,
         messageVolume,
       }}
+      footer={<CampaignAttribution />}
     />
   );
 }
