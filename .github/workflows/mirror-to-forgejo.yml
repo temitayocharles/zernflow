@@ -1,0 +1,62 @@
+name: Mirror GitHub branches to canonical Forgejo
+
+on:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-to-forgejo-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    env:
+      FORGEJO_MIRROR_TOKEN: ${{ secrets.FORGEJO_MIRROR_TOKEN }}
+      FORGEJO_REPO_URL: https://forgejo.tayoca.com/temitayocharles/zernflow.git
+      FORGEJO_API_URL: https://forgejo.tayoca.com/api/v1
+    steps:
+      - name: Skip until mirror credential is configured
+        if: env.FORGEJO_MIRROR_TOKEN == ''
+        run: echo "FORGEJO_MIRROR_TOKEN is not configured; mirror is inactive."
+
+      - name: Check out full branch history
+        if: env.FORGEJO_MIRROR_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward branch into Forgejo
+        if: env.FORGEJO_MIRROR_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_REF_NAME}"
+          git remote add forgejo "${FORGEJO_REPO_URL}"
+          git -c http.extraHeader="Authorization: token ${FORGEJO_MIRROR_TOKEN}" fetch forgejo "refs/heads/${branch}:refs/remotes/forgejo/${branch}" || true
+          if git show-ref --verify --quiet "refs/remotes/forgejo/${branch}"; then
+            if ! git merge-base --is-ancestor "refs/remotes/forgejo/${branch}" HEAD; then
+              echo "::error::Forgejo branch has commits not present in GitHub. Refusing non-fast-forward sync."
+              exit 1
+            fi
+          fi
+          git -c http.extraHeader="Authorization: token ${FORGEJO_MIRROR_TOKEN}" push forgejo "HEAD:refs/heads/${branch}"
+
+      - name: Ensure canonical Forgejo PR exists
+        if: env.FORGEJO_MIRROR_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_REF_NAME}"
+          existing="$(curl -fsS -H "Authorization: token ${FORGEJO_MIRROR_TOKEN}" "${FORGEJO_API_URL}/repos/temitayocharles/zernflow/pulls?state=open&head=temitayocharles:${branch}&base=main&limit=1")"
+          if [ "$(printf '%s' "${existing}" | jq 'length')" -eq 0 ]; then
+            payload="$(jq -n --arg title "Sync GitHub branch: ${branch}" --arg head "${branch}" --arg base "main" --arg body "Automated mirror of GitHub branch \`${branch}\`. Forgejo remains canonical: merge here only after required Forgejo CI passes." '{title:$title,head:$head,base:$base,body:$body}')"
+            curl -fsS -X POST -H "Authorization: token ${FORGEJO_MIRROR_TOKEN}" -H "Content-Type: application/json" -d "${payload}" "${FORGEJO_API_URL}/repos/temitayocharles/zernflow/pulls"
+          else
+            echo "Matching Forgejo PR already exists."
+          fi
