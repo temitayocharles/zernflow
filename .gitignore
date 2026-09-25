@@ -39,3 +39,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 supabase/.temp
+
+# browser executor worker package (built separately; see workers/browser-executor)
+/workers/*/node_modules
+/workers/*/dist
