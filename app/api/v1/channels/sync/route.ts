@@ -8,7 +8,10 @@ import {
   SocialGatewayError,
 } from "@/lib/social-gateway/client";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
+import { CHANNEL_SAFE_COLUMNS } from "@/lib/workspace";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getWorkspace } from "@/lib/workspace";
+import { gatewayBindingViolation } from "@/lib/social-gateway/tenancy";
 
 function gatewayFailure(error: unknown): NextResponse {
   if (error instanceof SocialGatewayConfigurationError) {
@@ -48,11 +51,19 @@ export async function POST() {
     );
   }
 
+  const bindingViolation = await gatewayBindingViolation(workspace.id);
+  if (bindingViolation) return bindingViolation;
+
+  // Projection writes use the service role (browser roles cannot insert
+  // channels since 00030); every statement stays scoped to workspace.id,
+  // which was authorized above (owner + gateway binding).
+  const projection = await createServiceClient();
+
   try {
     const gateway = requireSocialGatewayClient();
     const [{ accounts }, existingResult] = await Promise.all([
       gateway.listAccounts(),
-      supabase
+      projection
         .from("channels")
         .select(
           "id, late_account_id, platform, username, display_name, profile_picture, is_active",
@@ -72,7 +83,7 @@ export async function POST() {
     );
 
     if (plan.creates.length > 0) {
-      const { error } = await supabase.from("channels").insert(
+      const { error } = await projection.from("channels").insert(
         plan.creates.map((item) => ({
           workspace_id: workspace.id,
           platform: item.platform,
@@ -87,7 +98,7 @@ export async function POST() {
     }
 
     for (const item of plan.updates) {
-      const { error } = await supabase
+      const { error } = await projection
         .from("channels")
         .update({
           platform: item.platform,
@@ -102,7 +113,7 @@ export async function POST() {
     }
 
     if (plan.deactivateChannelIds.length > 0) {
-      const { error } = await supabase
+      const { error } = await projection
         .from("channels")
         .update({ is_active: false })
         .eq("workspace_id", workspace.id)
@@ -112,7 +123,7 @@ export async function POST() {
 
     const { data: channels, error: channelListError } = await supabase
       .from("channels")
-      .select("*")
+      .select(CHANNEL_SAFE_COLUMNS)
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false });
     if (channelListError) {
