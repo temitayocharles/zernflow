@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/observability/log";
+import { increment } from "@/lib/observability/metrics";
 import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { executeFlow } from "@/lib/flow-engine/engine";
 import { matchTrigger } from "@/lib/flow-engine/trigger-matcher";
 import { resolveWebhookSecret, verifyWebhookSignature } from "@/lib/zernio-webhook";
-import { upsertContactForSender } from "@/lib/inbox-sync";
+import { upsertContactForSender } from "@/lib/contacts/sender";
 import { processComment } from "@/lib/comment-processor";
 import type { Database } from "@/lib/types/database";
 
@@ -76,7 +78,23 @@ interface CommentWebhookPayload {
 
 // ── Webhook handler ─────────────────────────────────────────────────────────
 
+/**
+ * DEPRECATED legacy Zernio ingress (Zernio stage 2, removal manifest §3).
+ * Still live: it has no ENABLE_LEGACY_ZERNIO gate, so deployments that still
+ * receive Zernio deliveries keep working. Two operator seams prepare removal:
+ *   - every delivery increments legacy_zernio_webhook_total and logs
+ *     legacy.zernio_webhook.received (evidence of remaining traffic);
+ *   - LEGACY_ZERNIO_WEBHOOK=reject answers 410 Gone without processing, a
+ *     reversible brownout to prove nothing depends on it before deletion.
+ */
 export async function POST(request: NextRequest) {
+  if (process.env.LEGACY_ZERNIO_WEBHOOK?.trim().toLowerCase() === "reject") {
+    increment("legacy_zernio_webhook_total", { outcome: "rejected" });
+    logger.warn("legacy.zernio_webhook.rejected", { operation: "legacy_zernio_webhook", status: "gone" });
+    return NextResponse.json({ error: "Legacy Zernio webhooks are disabled on this deployment" }, { status: 410 });
+  }
+  increment("legacy_zernio_webhook_total", { outcome: "accepted" });
+  logger.info("legacy.zernio_webhook.received", { operation: "legacy_zernio_webhook", status: "accepted" });
   try {
     return await handleWebhook(request);
   } catch (err) {
