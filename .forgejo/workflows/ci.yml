@@ -62,3 +62,11 @@ jobs:
       - name: Production build
         shell: sh
         run: npm run build
+
+      - name: Browser executor (install, audit, build)
+        shell: sh
+        run: |
+          set -eu
+          npm ci --prefix workers/browser-executor --no-audit --no-fund
+          npm audit --prefix workers/browser-executor --omit=dev --audit-level=high
+          npm run build --prefix workers/browser-executor
