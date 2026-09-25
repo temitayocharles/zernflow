@@ -20,7 +20,8 @@ import type { Database, Platform } from "@/lib/types/database";
 
 import { CONNECTORS, getConnector } from "@/lib/connectors/registry";
 
-type Channel = Database["public"]["Tables"]["channels"]["Row"];
+// webhook_secret is server-only (migration 00030) and never reaches the browser.
+type Channel = Omit<Database["public"]["Tables"]["channels"]["Row"], "webhook_secret">;
 
 function getPlatformLabel(platform: string): string {
   return getConnector(platform)?.label ?? platform;
@@ -192,6 +193,10 @@ export function ChannelsView({
       }
 
       setChannels((prev) => prev.filter((c) => c.id !== id));
+      if (data.notice) {
+        setSyncMessage(data.notice);
+        setTimeout(() => setSyncMessage(null), 6000);
+      }
     } catch {
       setSyncMessage("Failed to delete channel. Check your connection.");
       setTimeout(() => setSyncMessage(null), 4000);
@@ -476,11 +481,11 @@ export function ChannelsView({
       <ConfirmDialog
         open={!!channelToDelete}
         title="Delete channel?"
-        message={`This disconnects ${
+        message={`This removes ${
           channelToDelete?.display_name ??
           channelToDelete?.username ??
           (channelToDelete ? getPlatformLabel(channelToDelete.platform) : "this channel")
-        } from Zernio and permanently deletes its conversations, contact links, and stats in Zernflow. This cannot be undone.`}
+        } from ZernFlow and permanently deletes its conversations, contact links, and stats here. This cannot be undone. The provider account stays connected in Agent Social Gateway, so the next sync re-imports it unless you disconnect it there first.`}
         confirmLabel="Delete"
         destructive
         onConfirm={handleDelete}
