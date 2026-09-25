@@ -19,7 +19,7 @@ vi.mock("@/lib/social-gateway/webhook-processor", () => ({
 import { GET } from "./route";
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("CRON_SECRET", "test-cron-secret");
+  vi.stubEnv("CRON_SECRET", "test-cron-secret-with-24-characters");
   const prune = { eq: mocks.eq, lt: () => Promise.resolve({ error: null }) };
   mocks.eq.mockReturnValue(prune);
   const jobs = {
@@ -45,10 +45,20 @@ describe("existing cron SLA integration", () => {
     ).toBe(401);
     expect(mocks.client).not.toHaveBeenCalled();
   });
+  it("refuses the legacy query-string secret (leaks into access logs)", async () => {
+    expect(
+      (
+        await GET(
+          new NextRequest("https://app.example/api/cron/jobs?key=test-cron-secret-with-24-characters"),
+        )
+      ).status,
+    ).toBe(401);
+    expect(mocks.client).not.toHaveBeenCalled();
+  });
   it("scans SLA even when no other jobs are pending and preserves durable Gateway events", async () => {
     const response = await GET(
       new NextRequest("https://app.example/api/cron/jobs", {
-        headers: { Authorization: "Bearer test-cron-secret" },
+        headers: { Authorization: "Bearer test-cron-secret-with-24-characters" },
       }),
     );
     expect(await response.json()).toMatchObject({
@@ -67,7 +77,7 @@ describe("existing cron SLA integration", () => {
     });
     const response = await GET(
       new NextRequest("https://app.example/api/cron/jobs", {
-        headers: { Authorization: "Bearer test-cron-secret" },
+        headers: { Authorization: "Bearer test-cron-secret-with-24-characters" },
       }),
     );
     expect(response.status).toBe(503);
