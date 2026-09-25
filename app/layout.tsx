@@ -9,25 +9,25 @@ const appUrl = (
 
 export const metadata: Metadata = {
   title: {
-    default: "ZernFlow - The Open Source ManyChat Alternative",
+    default: "ZernFlow - Self-hosted creator operating system",
     template: "%s | ZernFlow",
   },
   description:
-    "Automate DMs, comments, and flows across Instagram, Facebook, Telegram, X, Bluesky, and Reddit. Free, self-hostable, and open source.",
+    "Campaigns, scheduled publishing, comment and DM automations, a shared inbox and a customer CRM in one self-hosted workspace.",
   metadataBase: new URL(appUrl),
   openGraph: {
-    title: "ZernFlow - The Open Source ManyChat Alternative",
+    title: "ZernFlow - Self-hosted creator operating system",
     description:
-      "Automate DMs, comments, and flows across Instagram, Facebook, Telegram, X, Bluesky, and Reddit. Free, self-hostable, and open source.",
+      "Campaigns, scheduled publishing, comment and DM automations, a shared inbox and a customer CRM in one self-hosted workspace.",
     url: appUrl,
     siteName: "ZernFlow",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ZernFlow - The Open Source ManyChat Alternative",
+    title: "ZernFlow - Self-hosted creator operating system",
     description:
-      "Automate DMs, comments, and flows across 6 platforms. Free, self-hostable, open source.",
+      "Campaigns, publishing, automations, inbox and CRM in one self-hosted workspace.",
   },
   icons: {
     icon: [
