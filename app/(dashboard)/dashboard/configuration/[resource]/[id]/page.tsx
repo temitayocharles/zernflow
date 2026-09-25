@@ -1,6 +1,5 @@
-import { EditorialVariants } from "@/components/product/editorial-variants";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/workspace";
 import { configurationForms } from "@/lib/product/forms";
 import { RecordForm } from "@/components/product/record-form";
@@ -16,6 +15,8 @@ export default async function Detail({
   const { resource, id } = await params;
   if (!configResource(resource) || resource === "editorial_variants")
     notFound();
+  // Content is managed in the Content workspace (campaigns, variants, scheduling).
+  if (resource === "editorial_drafts") redirect(`/dashboard/content/${id}`);
   const { supabase, workspace, role } = await getWorkspace();
   const { data, error } = await supabase
     .from(resource)
@@ -26,23 +27,6 @@ export default async function Detail({
   if (error) throw new Error("Configuration unavailable");
   if (!data) notFound();
   const form = configurationForms[resource];
-  const [variants, channels] =
-    resource === "editorial_drafts"
-      ? await Promise.all([
-          supabase
-            .from("editorial_variants")
-            .select()
-            .eq("workspace_id", workspace.id)
-            .eq("draft_id", id),
-          supabase
-            .from("channels")
-            .select("id,display_name,platform")
-            .eq("workspace_id", workspace.id),
-        ])
-      : [
-          { data: [], error: null },
-          { data: [], error: null },
-        ];
   const { data: activity } = await supabase
     .from("product_activity")
     .select()
@@ -76,19 +60,6 @@ export default async function Detail({
           Only the workspace owner can edit this configuration.
         </p>
       )}
-      {resource === "editorial_drafts" &&
-        (variants.error || channels.error ? (
-          <p role="alert">Channel variants unavailable.</p>
-        ) : (
-          <EditorialVariants
-            draftId={id}
-            variants={variants.data ?? []}
-            channels={(channels.data ?? []).map((c) => ({
-              id: c.id,
-              label: c.display_name ?? c.platform,
-            }))}
-          />
-        ))}
       <section className="space-y-2">
         <h2 className="font-semibold">Activity (latest 50)</h2>
         {activity?.map((a) => (
