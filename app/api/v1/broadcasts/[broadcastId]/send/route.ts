@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { scheduleBroadcastDelivery } from "@/lib/scheduler";
+import { selectedMembership } from "@/lib/workspace-membership";
+import { BroadcastScheduleError, scheduleBroadcastDelivery } from "@/lib/scheduler";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database";
 
@@ -41,12 +42,7 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
+  const membership = await selectedMembership(supabase, user.id);
 
   if (!membership) {
     return NextResponse.json({ error: "No workspace" }, { status: 404 });
@@ -81,7 +77,8 @@ export async function POST(
       await supabase
         .from("broadcasts")
         .update({ message_content: messageContent as unknown as Json })
-        .eq("id", broadcastId);
+        .eq("id", broadcastId)
+        .eq("workspace_id", membership.workspace_id);
     }
   } catch {
     // No body or invalid JSON, use existing message_content
@@ -153,10 +150,10 @@ export async function POST(
       .select("id");
 
     if (insertErr) {
-      console.error("Failed to insert broadcast recipients:", insertErr);
+      console.error("Failed to insert broadcast recipients", { code: insertErr.code });
       return NextResponse.json(
-        { error: `Failed to create recipients: ${insertErr.message}` },
-        { status: 500 }
+        { error: "Failed to create recipients" },
+        { status: insertErr.code === "23514" ? 400 : 500 }
       );
     }
 
@@ -172,13 +169,29 @@ export async function POST(
     );
   }
 
-  // Schedule delivery
-  await scheduleBroadcastDelivery(supabase, broadcastId, recipientIds);
+  // Schedule delivery (membership-checked RPC; honors scheduled_for)
+  let scheduledJobs: number;
+  try {
+    ({ scheduledJobs } = await scheduleBroadcastDelivery(supabase, broadcastId));
+  } catch (error) {
+    if (error instanceof BroadcastScheduleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
+
+  const { data: scheduled } = await supabase
+    .from("broadcasts")
+    .select("status")
+    .eq("id", broadcastId)
+    .eq("workspace_id", membership.workspace_id)
+    .single();
 
   return NextResponse.json({
     broadcastId,
     totalRecipients: recipientIds.length,
-    status: "sending",
+    scheduledJobs,
+    status: scheduled?.status ?? "sending",
   });
 }
 
