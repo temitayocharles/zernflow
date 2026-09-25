@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { selectedMembership } from "@/lib/workspace-membership";
 
 async function getWorkspaceId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -7,12 +8,7 @@ async function getWorkspaceId(supabase: Awaited<ReturnType<typeof createClient>>
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
+  const membership = await selectedMembership(supabase, user.id);
 
   return membership?.workspace_id || null;
 }
