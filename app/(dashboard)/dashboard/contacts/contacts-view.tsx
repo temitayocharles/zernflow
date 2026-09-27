@@ -36,6 +36,10 @@ const platformLabels: Record<Platform, string> = {
   bluesky: "Bluesky",
   reddit: "Reddit",
   whatsapp: "WhatsApp",
+  threads: "Threads",
+  linkedin: "LinkedIn",
+  tiktok: "TikTok",
+  youtube: "YouTube",
 };
 
 function formatDate(dateStr: string | null): string {

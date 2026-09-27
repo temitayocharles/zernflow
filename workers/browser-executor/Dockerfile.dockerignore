@@ -1,0 +1,8 @@
+# BuildKit reads <Dockerfile>.dockerignore; the context is the repository root.
+*
+!lib/browser/**
+!workers/browser-executor/package.json
+!workers/browser-executor/package-lock.json
+!workers/browser-executor/tsconfig.json
+!workers/browser-executor/src/**
+**/*.test.ts

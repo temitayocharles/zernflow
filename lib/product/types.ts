@@ -68,12 +68,34 @@ export interface EditorialDraft extends ProductRecord {
   timezone: string;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  /** 00033 */
+  campaign_id: string | null;
+  kind: "post" | "short_video" | "story" | "thread" | "article" | "reel" | "carousel";
+  link_url: string | null;
+  utm: Record<string, string>;
+  asset_ids: string[];
+  created_by: string | null;
+  /** 00039 — set on copies materialised by a `content.recur` schedule */
+  source_draft_id: string | null;
+  source_task_id: string | null;
 }
+export type PublishState = "draft" | "scheduled" | "queued" | "publishing" | "published" | "failed" | "cancelled";
 export interface EditorialVariant extends ProductRecord {
   draft_id: string;
   channel_id: string;
   body: string;
   media_refs: string[];
+  /** 00033 — managed by the scheduler, read-only for clients */
+  publish_state: PublishState;
+  scheduled_at: string | null;
+  execution_mode: "api" | "browser" | "manual" | null;
+  idempotency_key: string | null;
+  task_id: string | null;
+  external_ref: string | null;
+  external_url: string | null;
+  published_at: string | null;
+  last_error: string | null;
+  attempt_count: number;
 }
 export interface KnowledgeSource extends ProductRecord {
   name: string;

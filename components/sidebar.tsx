@@ -3,27 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
-import {
-  GitBranch,
-  MessageSquare,
-  Users,
-  Radio,
-  ListOrdered,
-  BarChart3,
-  Sprout,
-  Plug,
-  Settings,
-  LogOut,
-  Moon,
-  Sun,
-} from "lucide-react";
+import { LogOut, Moon, Sun } from "lucide-react";
+import { activeHref, NAVIGATION } from "@/components/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
-import type { Database } from "@/lib/types/database";
 
-type Workspace = Database["public"]["Tables"]["workspaces"]["Row"];
+/** Only browser-safe identity fields are ever passed to this client component. */
+type Workspace = { id: string; name: string; slug: string };
 
 interface WorkspaceItem {
   id: string;
@@ -38,35 +26,19 @@ function subscribeToThemeClass(callback: () => void) {
   return () => observer.disconnect();
 }
 
-const navigation = [
-  { name: "Flows", href: "/dashboard/flows", icon: GitBranch },
-  { name: "Inbox", href: "/dashboard/inbox", icon: MessageSquare },
-  { name: "Contacts", href: "/dashboard/contacts", icon: Users },
-  { name: "Editorial", href: "/dashboard/configuration/editorial_drafts", icon: Radio },
-  { name: "Email identities", href: "/dashboard/configuration/mailbox_identities", icon: MessageSquare },
-  { name: "Knowledge", href: "/dashboard/knowledge", icon: ListOrdered },
-  { name: "Notifications", href: "/dashboard/notifications", icon: MessageSquare },
-  { name: "Canned replies", href: "/dashboard/canned-replies", icon: MessageSquare },
-  { name: "Work items", href: "/dashboard/work-items", icon: ListOrdered },
-  { name: "CRM", href: "/dashboard/crm/companies", icon: Users },
-  { name: "Broadcasts", href: "/dashboard/broadcasts", icon: Radio },
-  { name: "Sequences", href: "/dashboard/sequences", icon: ListOrdered },
-  { name: "Operator analytics", href: "/dashboard/operations", icon: BarChart3 },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { name: "Growth", href: "/dashboard/growth", icon: Sprout },
-  { name: "Channels", href: "/dashboard/channels", icon: Plug },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-];
 
 export function Sidebar({
   workspace,
   workspaces,
+  role,
 }: {
+  role?: string;
   workspace: Workspace;
   user: { id: string; email?: string };
   workspaces: WorkspaceItem[];
 }) {
   const pathname = usePathname();
+  const current = activeHref(pathname);
   const router = useRouter();
   const supabase = createClient();
   const dark = useSyncExternalStore(
@@ -93,23 +65,35 @@ export function Sidebar({
         <WorkspaceSwitcher current={workspace} workspaces={workspaces} />
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-        {navigation.map((item) => {
-          const isActive = pathname.startsWith(item.href);
+      <nav aria-label="Main" className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+        {NAVIGATION.map((group) => {
+          const items = group.items.filter((i) => !i.ownerOnly || role === "owner");
+          if (!items.length) return null;
           return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            <div key={group.label ?? "home"} className="space-y-1">
+              {group.label && (
+                <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/50">{group.label}</p>
               )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.name}
-            </Link>
+              {items.map((item) => {
+                const isActive = item.href === current;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>

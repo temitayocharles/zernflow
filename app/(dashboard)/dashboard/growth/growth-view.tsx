@@ -18,7 +18,8 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Json, Platform } from "@/lib/types/database";
 
-type Channel = Database["public"]["Tables"]["channels"]["Row"];
+// webhook_secret is server-only (migration 00030) and never reaches the browser.
+type Channel = Omit<Database["public"]["Tables"]["channels"]["Row"], "webhook_secret">;
 type CommentLog = Database["public"]["Tables"]["comment_logs"]["Row"];
 
 interface TriggerWithFlow {
@@ -50,6 +51,10 @@ const platformLabels: Record<Platform, string> = {
   bluesky: "Bluesky",
   reddit: "Reddit",
   whatsapp: "WhatsApp",
+  threads: "Threads",
+  linkedin: "LinkedIn",
+  tiktok: "TikTok",
+  youtube: "YouTube",
 };
 
 export function GrowthView({
@@ -477,8 +482,9 @@ export function GrowthView({
                   className="mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground/60">
-                  Limit this rule to specific Zernio post IDs. If empty, all posts
-                  on this channel are monitored.
+                  Limit this rule to specific post IDs (the platform post reference
+                  the Gateway reports for the comment). If empty, all posts on this
+                  channel are monitored.
                 </p>
               </div>
             </div>

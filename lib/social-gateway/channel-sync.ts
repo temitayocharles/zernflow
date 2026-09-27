@@ -55,12 +55,21 @@ function isActive(account: GatewayAccount): boolean {
   return account.status === "active";
 }
 
+export const MANUAL_CHANNEL_PREFIX = "manual:";
+
+export function isManualChannelRef(ref: string): boolean {
+  return ref.startsWith(MANUAL_CHANNEL_PREFIX);
+}
+
 export function planGatewayChannelSync(
   accounts: GatewayAccount[],
   existingChannels: ExistingChannel[],
 ): ChannelSyncPlan {
+  // Operator-registered manual channels (00039, "manual:<platform>:<handle>") are
+  // not Gateway projections: sync never updates or deactivates them.
+  const gatewayChannels = existingChannels.filter((channel) => !isManualChannelRef(channel.late_account_id));
   const existingByGatewayId = new Map(
-    existingChannels.map((channel) => [channel.late_account_id, channel]),
+    gatewayChannels.map((channel) => [channel.late_account_id, channel]),
   );
   const observedAccountIds = new Set<string>();
   const creates: ChannelCreatePlan[] = [];
@@ -70,7 +79,7 @@ export function planGatewayChannelSync(
   for (const account of accounts) {
     observedAccountIds.add(account._id);
     const platform = asSupportedPlatform(account.platform);
-    if (!platform) {
+    if (!platform || isManualChannelRef(account._id)) {
       unsupported.push({ gatewayAccountId: account._id, platform: account.platform });
       continue;
     }
@@ -100,7 +109,7 @@ export function planGatewayChannelSync(
     }
   }
 
-  const deactivateChannelIds = existingChannels
+  const deactivateChannelIds = gatewayChannels
     .filter(
       (channel) =>
         channel.is_active && !observedAccountIds.has(channel.late_account_id),

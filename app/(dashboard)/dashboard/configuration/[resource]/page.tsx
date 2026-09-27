@@ -1,6 +1,6 @@
 import { Pagination } from "@/components/product/pagination";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/workspace";
 import { configurationForms } from "@/lib/product/forms";
 import { RecordForm } from "@/components/product/record-form";
@@ -18,6 +18,8 @@ export default async function Configuration({
   const { resource } = await params;
   if (!configResource(resource) || resource === "editorial_variants")
     notFound();
+  // Content is managed in the Content workspace (campaigns, variants, scheduling).
+  if (resource === "editorial_drafts") redirect("/dashboard/content");
   const { supabase, workspace, role } = await getWorkspace();
   const form = configurationForms[resource];
   const search = await searchParams;

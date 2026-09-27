@@ -1,0 +1,20 @@
+{
+  "name": "@zernflow/browser-executor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ephemeral ZernFlow browser executor (Northflank Job 1). Claims browser-mode tasks over the worker API, runs one isolated Playwright context at a time, and exits when idle.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/workers/browser-executor/src/main.js"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  },
+  "devDependencies": {
+    "@types/node": "25.2.3",
+    "typescript": "5.9.3"
+  }
+}

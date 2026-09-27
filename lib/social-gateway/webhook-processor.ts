@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { processComment } from "@/lib/comment-processor";
 import { executeFlow } from "@/lib/flow-engine/engine";
 import { matchTrigger } from "@/lib/flow-engine/trigger-matcher";
-import { upsertContactForSender } from "@/lib/inbox-sync";
+import { upsertContactForSender } from "@/lib/contacts/sender";
 import type { Database, Json } from "@/lib/types/database";
 import type { SocialGatewayWebhookEnvelope } from "./webhook";
 

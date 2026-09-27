@@ -56,3 +56,19 @@ describe("product integration configuration", () => {
     ).toThrow();
   });
 });
+
+describe("content (editorial_drafts) publishing fields", () => {
+  const A = "a0000000-0000-4000-8000-000000000001";
+  it("validates campaign, kind, link, utm and assets", () => {
+    expect(
+      parseConfiguration("editorial_drafts", {
+        name: "x", campaign_id: "", kind: "reel", link_url: "https://shop.example/p", utm: { campaign: "fall", term: "" }, asset_ids: [A, A],
+      }),
+    ).toEqual({ name: "x", campaign_id: null, kind: "reel", link_url: "https://shop.example/p", utm: { campaign: "fall" }, asset_ids: [A] });
+    expect(() => parseConfiguration("editorial_drafts", { name: "x", link_url: "javascript:alert(1)" })).toThrow(/http/);
+    expect(() => parseConfiguration("editorial_drafts", { name: "x", utm: { source: "x", evil: "y" } })).toThrow(/UTM/);
+    expect(() => parseConfiguration("editorial_drafts", { name: "x", kind: "hologram" })).toThrow();
+    expect(() => parseConfiguration("editorial_drafts", { name: "x", asset_ids: ["../etc"] })).toThrow();
+    expect(() => parseConfiguration("editorial_variants", { draft_id: A, channel_id: A, body: "b", publish_state: "published" })).toThrow();
+  });
+});

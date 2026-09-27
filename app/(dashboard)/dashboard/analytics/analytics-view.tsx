@@ -1,4 +1,5 @@
 "use client";
+import type React from "react";
 
 import { useState, useEffect } from "react";
 import {
@@ -196,9 +197,12 @@ function MessageVolumeChart({
 export function AnalyticsView({
   workspaceId,
   initialData,
+  footer,
 }: {
   workspaceId: string;
   initialData: AnalyticsData;
+  /** Server-rendered sections shown inside the scroll area (e.g. campaign attribution). */
+  footer?: React.ReactNode;
 }) {
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
   const [customStart, setCustomStart] = useState("");
@@ -640,6 +644,7 @@ export function AnalyticsView({
             </div>
           </div>
         )}
+        {footer && <div className="mt-8">{footer}</div>}
       </div>
     </div>
   );

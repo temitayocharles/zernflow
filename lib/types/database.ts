@@ -1,4 +1,5 @@
 import type { ProductTables } from "@/lib/product/types";
+import type { PlatformFunctions, PlatformTables } from "@/lib/types/platform";
 export type Json =
   | string
   | number
@@ -14,7 +15,12 @@ export type Platform =
   | "telegram"
   | "bluesky"
   | "reddit"
-  | "whatsapp";
+  | "whatsapp"
+  // Manual/browser-published accounts only (00039: late_account_id must start with "manual:").
+  | "threads"
+  | "linkedin"
+  | "tiktok"
+  | "youtube";
 
 export type FlowStatus = "draft" | "published" | "archived";
 export type ConversationStatus = "open" | "closed" | "snoozed";
@@ -66,7 +72,7 @@ export interface SequenceStep {
 
 export interface Database {
   public: {
-    Tables: ProductTables & {
+    Tables: ProductTables & PlatformTables & {
       workspaces: {
         Row: {
           id: string;
@@ -196,6 +202,12 @@ export interface Database {
           metadata: Json | null;
           created_at: string;
           updated_at: string;
+          /** 00036 — system-maintained attribution */
+          first_touch_source: string;
+          first_touch_at: string | null;
+          last_touch_at: string | null;
+          first_campaign_id: string | null;
+          last_campaign_id: string | null;
         };
         Insert: {
           id?: string;
@@ -812,10 +824,12 @@ export interface Database {
           last_error: string | null;
           claimed_at: string | null;
           dedupe_key: string | null;
+          workspace_id: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
+          workspace_id?: string | null;
           type: string;
           payload: Json;
           run_at: string;
@@ -832,6 +846,24 @@ export interface Database {
           last_error?: string | null;
           claimed_at?: string | null;
           dedupe_key?: string | null;
+        };
+        Relationships: [];
+      };
+      gateway_workspace_bindings: {
+        Row: {
+          gateway_workspace_ref: string;
+          workspace_id: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          gateway_workspace_ref: string;
+          workspace_id: string;
+          created_by?: string;
+          created_at?: string;
+        };
+        Update: {
+          workspace_id?: string;
         };
         Relationships: [];
       };
@@ -1113,7 +1145,11 @@ export interface Database {
     Views: {
       [_ in never]: never;
     };
-    Functions: {
+    Functions: PlatformFunctions & {
+      schedule_broadcast_delivery: {
+        Args: { p_broadcast_id: string };
+        Returns: number;
+      };
       refresh_sla_notifications: {
         Args: { p_as_of?: string };
         Returns: number;

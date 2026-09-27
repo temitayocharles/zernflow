@@ -1,4 +1,4 @@
-import { getWorkspace } from "@/lib/workspace";
+import { CHANNEL_SAFE_COLUMNS, getWorkspace } from "@/lib/workspace";
 import { GrowthView } from "./growth-view";
 
 export default async function GrowthPage() {
@@ -20,7 +20,7 @@ export default async function GrowthPage() {
   ] = await Promise.all([
     supabase
       .from("channels")
-      .select("*")
+      .select(CHANNEL_SAFE_COLUMNS)
       .eq("workspace_id", workspace.id)
       .eq("is_active", true)
       .order("created_at", { ascending: false }),

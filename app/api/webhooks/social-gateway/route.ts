@@ -6,6 +6,7 @@ import {
   verifySocialGatewayWebhook,
 } from "@/lib/social-gateway/webhook";
 import type { Json } from "@/lib/types/database";
+import { assertBoundWorkspace, loadGatewayBinding } from "@/lib/social-gateway/tenancy";
 
 export const runtime = "nodejs";
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createServiceClient();
   const { data: channel, error: channelError } = await supabase
     .from("channels")
-    .select("id")
+    .select("id, workspace_id")
     .eq("late_account_id", envelope.provider_account_id)
     .eq("is_active", true)
     .maybeSingle();
@@ -77,6 +78,22 @@ export async function POST(request: NextRequest) {
   }
   if (!channel) {
     return jsonError("No active channel projects this gateway account", 404);
+  }
+
+  // Tenant binding: Gateway events may only land in the workspace bound to
+  // this deployment's Gateway workspace (fails closed when unbound/conflicting).
+  const binding = await loadGatewayBinding(supabase);
+  try {
+    assertBoundWorkspace(binding, channel.workspace_id);
+  } catch {
+    console.error("Social Gateway webhook rejected by workspace binding", {
+      eventId: envelope.id,
+      binding: binding.status,
+    });
+    return NextResponse.json(
+      { error: "Gateway workspace binding does not permit this delivery", code: "gateway_workspace_not_bound" },
+      { status: 409 },
+    );
   }
 
   const { data: claimResult, error: claimError } = await supabase.rpc(

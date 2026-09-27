@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database";
 import { executeFlow } from "@/lib/flow-engine/engine";
+import { recordCommentTouchpoint } from "@/lib/attribution/service";
 import { dispatchPublicCommentReply } from "@/lib/social-gateway/comment-reply";
 import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
 
@@ -173,6 +174,16 @@ export async function processComment({
         event_type: "contact_created",
       });
     }
+
+    // Campaign attribution: which published post brought this person in (idempotent per comment).
+    await recordCommentTouchpoint(supabase, {
+      workspaceId: channel.workspace_id,
+      channelId: channel.id,
+      contactId,
+      postId: comment.postId,
+      commentId: comment.id,
+      platform: channel.platform,
+    });
 
     let replySent = false;
     let replyProvider: "social_gateway" | "legacy_zernio" | null = null;

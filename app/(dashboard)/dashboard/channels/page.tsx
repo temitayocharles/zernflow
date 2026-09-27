@@ -1,15 +1,16 @@
 import { getSocialGatewayClient } from "@/lib/social-gateway/server";
 import { CONNECTORS, canStartOnboarding } from "@/lib/connectors/registry";
 import type { Platform } from "@/lib/types/database";
-import { getWorkspace } from "@/lib/workspace";
+import { CHANNEL_SAFE_COLUMNS, getWorkspace } from "@/lib/workspace";
 import { ChannelsView } from "./channels-view";
+import { ManualChannelForm } from "@/components/campaigns/manual-channel-form";
 
 export default async function ChannelsPage() {
   const { workspace, supabase, role } = await getWorkspace();
 
   const { data: channels } = await supabase
     .from("channels")
-    .select("*")
+    .select(CHANNEL_SAFE_COLUMNS)
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false });
 
@@ -29,12 +30,16 @@ export default async function ChannelsPage() {
   }
 
   return (
+    <>
     <ChannelsView
+      key={(channels ?? []).map((c) => c.id).join(",")}
       channels={channels ?? []}
       workspaceId={workspace.id}
       onboardingPlatforms={onboardingPlatforms}
       canManage={role === "owner"}
       readinessUnavailable={readinessUnavailable}
     />
+    {role === "owner" && <div className="px-6 pb-6"><ManualChannelForm /></div>}
+    </>
   );
 }

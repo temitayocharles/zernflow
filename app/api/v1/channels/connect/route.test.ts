@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getWorkspaceMock, readinessMock, startConnectionMock } = vi.hoisted(() => ({
+const { getWorkspaceMock, readinessMock, startConnectionMock, bindingMock } = vi.hoisted(() => ({
+  bindingMock: vi.fn(),
   getWorkspaceMock: vi.fn(),
   readinessMock: vi.fn(),
   startConnectionMock: vi.fn(),
@@ -8,6 +9,10 @@ const { getWorkspaceMock, readinessMock, startConnectionMock } = vi.hoisted(() =
 
 vi.mock("@/lib/workspace", () => ({
   getWorkspace: getWorkspaceMock,
+}));
+
+vi.mock("@/lib/social-gateway/tenancy", () => ({
+  gatewayBindingViolation: bindingMock,
 }));
 
 vi.mock("@/lib/social-gateway/server", () => ({
@@ -30,6 +35,7 @@ function request(body: unknown): Request {
 describe("POST /api/v1/channels/connect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    bindingMock.mockResolvedValue(null);
     process.env.NEXT_PUBLIC_APP_URL = "https://app.zernflow.com";
   });
 
@@ -99,5 +105,17 @@ describe("POST /api/v1/channels/connect", () => {
     });
     await expect(response.json()).resolves.toMatchObject({ session_id: "session-1" });
     expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("refuses owners of workspaces not bound to this deployment's Gateway", async () => {
+    getWorkspaceMock.mockResolvedValueOnce({ role: "owner", workspace: { id: "workspace-2" } });
+    bindingMock.mockResolvedValueOnce(
+      Response.json({ code: "gateway_workspace_not_bound" }, { status: 409 }),
+    );
+    const response = await POST(request({ platform: "instagram" }));
+    expect(response.status).toBe(409);
+    expect(bindingMock).toHaveBeenCalledWith("workspace-2");
+    expect(readinessMock).not.toHaveBeenCalled();
+    expect(startConnectionMock).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,7 @@ import type {
   GatewayConversationSummary,
 } from "@/lib/social-gateway/types";
 import { getWorkspace } from "@/lib/workspace";
+import { gatewayBindingViolation } from "@/lib/social-gateway/tenancy";
 
 const DEFAULT_SYNC_LIMIT = 50;
 const MAX_SYNC_LIMIT = 100;
@@ -212,6 +213,9 @@ export async function POST(request: NextRequest) {
       { status: 403 },
     );
   }
+
+  const bindingViolation = await gatewayBindingViolation(workspace.id);
+  if (bindingViolation) return bindingViolation;
 
   try {
     const input = parseSyncInput(request);

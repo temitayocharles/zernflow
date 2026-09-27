@@ -36,6 +36,10 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "workers/*/node_modules",
+    "workers/*/dist",
+    "workers/browser-executor/src/playwright-runtime.ts",
+    "workers/browser-executor/src/main.ts"
   ]
 }

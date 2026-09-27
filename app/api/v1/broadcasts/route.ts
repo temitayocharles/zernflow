@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { selectedMembership } from "@/lib/workspace-membership";
 
 export async function GET() {
   const supabase = await createClient();
@@ -8,12 +9,7 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
+  const membership = await selectedMembership(supabase, user.id);
 
   if (!membership) return NextResponse.json({ error: "No workspace" }, { status: 404 });
 
@@ -35,12 +31,7 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
+  const membership = await selectedMembership(supabase, user.id);
 
   if (!membership) return NextResponse.json({ error: "No workspace" }, { status: 404 });
 
