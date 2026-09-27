@@ -106,13 +106,13 @@ export const configurationForms: Record<
   { title: string; description: string; fields: Field[] }
 > = {
   editorial_drafts: {
-    title: "Editorial drafts",
+    title: "Content",
     description:
-      "Local editorial planning and owner approval. A scheduled date is intent only; nothing is queued or published until a Gateway execution adapter is accepted.",
+      "Content items with owner approval. Scheduling happens in Content: each channel variant becomes a durable publishing job that runs through a provider API, a managed browser session, or a manual confirm step — only routes that are actually available are offered.",
     fields: [
       { key: "name", label: "Title", required: true },
       { key: "body", label: "Content", type: "textarea" },
-      { key: "campaign", label: "Campaign group" },
+      { key: "campaign", label: "Legacy campaign label (use Campaigns)" },
       {
         key: "state",
         label: "Editorial review state",
