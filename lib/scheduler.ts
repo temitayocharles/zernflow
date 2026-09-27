@@ -1,63 +1,34 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json } from "@/lib/types/database";
+import type { Database } from "@/lib/types/database";
 
-/**
- * Schedule a job to run at a specific time.
- */
-export async function scheduleJob(
-  supabase: SupabaseClient<Database>,
-  type: string,
-  payload: Record<string, unknown>,
-  runAt: Date
-) {
-  const { data, error } = await supabase
-    .from("scheduled_jobs")
-    .insert({
-      type,
-      payload: payload as unknown as Json,
-      run_at: runAt.toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (error) throw error;
-  return data;
+export class BroadcastScheduleError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "BroadcastScheduleError";
+  }
 }
 
 /**
- * Schedule broadcast delivery. Creates individual jobs for each recipient
- * with 100ms spacing to avoid rate limits.
+ * Schedule broadcast delivery through the `schedule_broadcast_delivery` RPC
+ * (migration 00030). Browser roles can no longer write scheduled_jobs; the RPC
+ * checks membership, honors broadcasts.scheduled_for, spaces jobs 100 ms
+ * apart, deduplicates per recipient, and sets the broadcast to `scheduled`
+ * (future start) or `sending`.
  */
 export async function scheduleBroadcastDelivery(
   supabase: SupabaseClient<Database>,
   broadcastId: string,
-  recipientIds: string[]
-) {
-  if (recipientIds.length === 0) {
-    throw new Error("No recipients to schedule");
+): Promise<{ scheduledJobs: number }> {
+  const { data, error } = await supabase.rpc("schedule_broadcast_delivery", {
+    p_broadcast_id: broadcastId,
+  });
+  if (error) {
+    if (error.code === "42501") throw new BroadcastScheduleError("Broadcast not found", 404);
+    if (error.code === "23514") throw new BroadcastScheduleError("Broadcast cannot be scheduled in its current state", 409);
+    throw new BroadcastScheduleError("Failed to schedule broadcast delivery", 503);
   }
-
-  const jobs = recipientIds.map((recipientId, index) => ({
-    type: "send_broadcast",
-    payload: { broadcastId, recipientId } as unknown as Json,
-    run_at: new Date(Date.now() + index * 100).toISOString(),
-    status: "pending" as const,
-  }));
-
-  // Insert in batches of 100
-  const batchSize = 100;
-  for (let i = 0; i < jobs.length; i += batchSize) {
-    const batch = jobs.slice(i, i + batchSize);
-    const { error } = await supabase.from("scheduled_jobs").insert(batch);
-    if (error) throw new Error(`Failed to schedule jobs: ${error.message}`);
-  }
-
-  // Update broadcast status
-  await supabase
-    .from("broadcasts")
-    .update({
-      status: "sending",
-      total_recipients: recipientIds.length,
-    })
-    .eq("id", broadcastId);
+  return { scheduledJobs: data ?? 0 };
 }
