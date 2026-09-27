@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import type { FlowExecutionContext, AiResponseNodeData } from "../types";
-import { createZernioClient } from "@/lib/zernio-client";
+import { requireSocialGatewayClient } from "@/lib/social-gateway/server";
+import { flowReplyIdempotencyKey } from "../gateway-message";
 import { generateText, createGateway } from "ai";
+import { resolveBindingOrNull, SECRET_BINDINGS } from "@/lib/secrets/store";
+import { logger } from "@/lib/observability/log";
 
 // Halt the run: continuing would let a downstream Send Message deliver the
 // literal "{{ai_response}}" token to the contact (same pause mechanism as
@@ -22,52 +25,46 @@ export async function executeAiResponse(
   supabase: SupabaseClient<Database>,
   data: AiResponseNodeData,
   context: FlowExecutionContext,
-  sessionId: string
+  sessionId: string,
+  nodeId = "ai-response",
 ) {
-  // Get workspace for Zernio API key + AI Gateway key
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted, ai_api_key")
-    .eq("id", context.workspaceId)
-    .single();
-
-  if (!workspace?.late_api_key_encrypted) {
-    console.error("No Zernio API key for workspace:", context.workspaceId);
+  // AI key precedence: secret store binding `ai.gateway_key` (R3) → legacy
+  // workspace column (server-only since 00030, importable via
+  // /api/v1/secrets/import-legacy) → deployment AI Gateway key. A configured
+  // but unusable secret fails closed rather than silently using another key.
+  let storedKey: string | null;
+  try {
+    storedKey = await resolveBindingOrNull(supabase, {
+      workspaceId: context.workspaceId,
+      binding: SECRET_BINDINGS.aiGatewayKey,
+      purpose: "flow.ai_response",
+      identity: { type: "service", id: "flow-engine" },
+    });
+  } catch (err) {
+    logger.error("ai_response.secret_unavailable", {
+      workspaceId: context.workspaceId,
+      error: err instanceof Error ? err.name : "unknown",
+    });
     return cancelRun(supabase, sessionId);
   }
+  const { data: workspace } = storedKey
+    ? { data: null }
+    : await supabase.from("workspaces").select("ai_api_key").eq("id", context.workspaceId).single();
 
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
-
-  // Resolve late_account_id from channel if not in context
-  let lateAccountId = context.lateAccountId;
-  if (!lateAccountId) {
-    const { data: channel } = await supabase
-      .from("channels")
-      .select("late_account_id, platform")
-      .eq("id", context.channelId)
-      .single();
-
-    if (!channel) {
-      console.error("No channel found for id:", context.channelId);
-      return cancelRun(supabase, sessionId);
-    }
-    lateAccountId = channel.late_account_id;
-    if (!context.platform) {
-      context.platform = channel.platform as FlowExecutionContext["platform"];
-    }
-  }
-
-  // Resolve late_conversation_id from conversation if not in context
+  // Replies go through Agent Social Gateway; legacy Zernio is no longer used.
   let lateConversationId = context.lateConversationId;
   if (!lateConversationId) {
     const { data: conversation } = await supabase
       .from("conversations")
       .select("late_conversation_id")
       .eq("id", context.conversationId)
+      .eq("workspace_id", context.workspaceId)
       .single();
 
     if (!conversation?.late_conversation_id) {
-      console.error("No late_conversation_id found for conversation:", context.conversationId);
+      console.error("AI response skipped: no Gateway conversation is projected", {
+        conversationId: context.conversationId,
+      });
       return cancelRun(supabase, sessionId);
     }
     lateConversationId = conversation.late_conversation_id;
@@ -99,7 +96,7 @@ export async function executeAiResponse(
 
   try {
     const model = data.model || "openai/gpt-4o-mini";
-    const aiGatewayKey = workspace.ai_api_key || process.env.AI_GATEWAY_API_KEY;
+    const aiGatewayKey = storedKey || workspace?.ai_api_key || process.env.AI_GATEWAY_API_KEY;
     const gw = createGateway({ apiKey: aiGatewayKey || undefined });
     const result = await generateText({
       model: gw(model),
@@ -115,11 +112,20 @@ export async function executeAiResponse(
     context.variables = { ...(context.variables ?? {}), ai_response: text };
 
     if (data.sendDirectly !== false) {
-      // Send via Zernio REST API (same pattern as executeSendMessage)
-      const response = await zernio.messages.sendInboxMessage({
-        path: { conversationId: lateConversationId },
-        body: { accountId: lateAccountId, message: text },
+      const gateway = requireSocialGatewayClient();
+      const operation = await gateway.replyToConversation(lateConversationId, {
+        text,
+        idempotencyKey: flowReplyIdempotencyKey({
+          workspaceId: context.workspaceId,
+          flowId: context.flowId,
+          sessionId,
+          nodeId,
+          messageIndex: 0,
+        }),
       });
+      if (operation.status === "failed") {
+        throw new Error(operation.error_message ?? "Agent Social Gateway rejected the AI reply");
+      }
 
       // Store outbound message
       await supabase.from("messages").insert({
@@ -128,9 +134,9 @@ export async function executeAiResponse(
         text,
         attachments: null,
         sent_by_flow_id: context.flowId,
-        sent_by_node_id: null,
-        platform_message_id: response.data?.data?.messageId || null,
-        status: "sent",
+        sent_by_node_id: nodeId,
+        platform_message_id: operation.external_reference ?? null,
+        status: operation.status === "succeeded" ? "sent" : "pending",
       });
 
       await supabase.from("analytics_events").insert({
@@ -141,7 +147,10 @@ export async function executeAiResponse(
       });
     }
   } catch (error) {
-    console.error("Failed to generate or send AI response:", error);
+    console.error("Failed to generate or send AI response", {
+      flowId: context.flowId,
+      error: error instanceof Error ? error.name : "unknown",
+    });
 
     await supabase.from("messages").insert({
       conversation_id: context.conversationId,
@@ -156,7 +165,7 @@ export async function executeAiResponse(
       flow_id: context.flowId,
       contact_id: context.contactId,
       event_type: "message_failed",
-      metadata: { error: error instanceof Error ? error.message : "Unknown error" },
+      metadata: { error: error instanceof Error ? error.name : "Unknown error" },
     });
 
     return cancelRun(supabase, sessionId);
