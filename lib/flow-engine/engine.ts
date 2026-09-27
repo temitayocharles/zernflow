@@ -1,3 +1,5 @@
+import { safeFetch, UnsafeUrlError } from "@/lib/security/safe-fetch";
+import { scheduleFlowResume } from "@/lib/jobs/schedule-resume";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database";
 import type {
@@ -55,10 +57,13 @@ export async function executeFlow(
   }
 
   // Load flow
+  // Always scope by workspace: flow ids can arrive from goToFlow node data,
+  // which a member controls, and this runs with the service-role client.
   const { data: flow } = await supabase
     .from("flows")
     .select("*")
     .eq("id", context.flowId)
+    .eq("workspace_id", context.workspaceId)
     .eq("status", "published")
     .single();
 
@@ -145,6 +150,7 @@ export async function resumeSession(
     .from("flows")
     .select("*")
     .eq("id", session.flow_id)
+    .eq("workspace_id", context.workspaceId)
     .single();
 
   if (!flow) {
@@ -378,7 +384,7 @@ async function executeNode(
         node.id,
       );
     case "aiResponse":
-      return executeAiResponse(supabase, node.data as AiResponseNodeData, context, sessionId);
+      return executeAiResponse(supabase, node.data as AiResponseNodeData, context, sessionId, node.id);
     case "abSplit":
       return executeABSplit(node.data as ABSplitNodeData);
     case "smartDelay":
@@ -604,10 +610,11 @@ async function executeDelay(
   const delayMs = data.duration * (multipliers[data.unit] || 1000);
   const runAt = new Date(Date.now() + delayMs).toISOString();
 
-  // Schedule a job to resume the flow
-  await supabase.from("scheduled_jobs").insert({
-    type: "resume_flow",
-    payload: {
+  // Routed to durable tasks or legacy scheduled_jobs (R8, migration 00037),
+  // with a legacy-insert fallback; see lib/jobs/schedule-resume.ts.
+  await scheduleFlowResume(
+    supabase,
+    {
       sessionId,
       nodeId,
       flowId: context.flowId,
@@ -619,8 +626,8 @@ async function executeDelay(
       lateAccountId: context.lateAccountId || null,
       variables: context.variables || {},
     },
-    run_at: runAt,
-  });
+    runAt
+  );
 
   // Update session to waiting
   await supabase
@@ -702,16 +709,19 @@ async function executeHttpRequest(
       ? interpolateVariables(data.body, context.variables || {})
       : undefined;
 
-    const response = await fetch(url, {
+    // SSRF-safe: public destinations only, no redirects, bounded time/size.
+    const response = await safeFetch(url, {
       method: data.method,
       headers: {
         "Content-Type": "application/json",
         ...data.headers,
       },
       body: data.method !== "GET" ? body : undefined,
+      timeoutMs: 10_000,
+      maxResponseBytes: 256 * 1024,
     });
 
-    const responseData = await response.text();
+    const responseData = response.text;
 
     // Store response in variable if configured
     if (data.responseVariable && context.variables) {
@@ -722,7 +732,10 @@ async function executeHttpRequest(
       }
     }
   } catch (error) {
-    console.error("HTTP request failed:", error);
+    console.error("HTTP request node failed", {
+      flowId: context.flowId,
+      reason: error instanceof UnsafeUrlError ? "unsafe_url" : error instanceof Error ? error.name : "unknown",
+    });
   }
 }
 
@@ -1005,6 +1018,7 @@ async function executeEnrollSequence(
     .from("sequences")
     .select("id, steps, status")
     .eq("id", data.sequenceId)
+    .eq("workspace_id", context.workspaceId)
     .single();
 
   if (!sequence || sequence.status !== "active") {
