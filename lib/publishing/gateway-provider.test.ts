@@ -7,6 +7,7 @@ import {
   GATEWAY_PUBLISHING_BLOCKED_REASON,
   blockedGatewayPublishingTransport,
   createGatewayPublishingProvider,
+  httpGatewayPublishingTransport,
   outcomeFromGatewayOperation,
   registerGatewayPublishingTransport,
   type GatewayPublishingTransport,
@@ -98,6 +99,83 @@ describe("concrete Gateway transport seam", () => {
       async getOperation() { throw new SocialGatewayError("upstream", "bad gateway", { status: 502 }); },
     }));
     expect(await apiProviderFor("instagram", "post")!.status!("op-1", AbortSignal.timeout(1000))).toMatchObject({ status: "accepted", pollAfterMs: 60_000 });
+  });
+});
+
+
+describe("published Gateway HTTP transport", () => {
+  const operation = op({ id: "op-publication", idempotency_key: "publish:variant:v1:1" });
+
+  it("submits the published wire contract with operator auth and polls the operation", async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return new Response(JSON.stringify(operation), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    const transport = httpGatewayPublishingTransport({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "operator-api-key-with-at-least-24-characters",
+      actorRef: "zernflow:test",
+      workspaceRef: "workspace-test",
+      fetchImpl,
+      production: true,
+    });
+
+    expect(transport.available).toBe(true);
+    expect(transport.idempotentSubmit).toBe(true);
+    expect(transport.supports).toEqual([{ platform: "facebook", kinds: ["post"] }]);
+
+    await transport.submitPublication(
+      {
+        accountRef: "0d4d5b1c-7e63-4cb7-a56b-d221d913e6e2",
+        platform: "facebook",
+        kind: "post",
+        text: "Launch update",
+        media: [{ url: "https://cdn.example.test/a.png", contentType: "image/png" }],
+        idempotencyKey: "publish:variant:v1:1",
+      },
+      AbortSignal.timeout(1000),
+    );
+    await transport.getOperation("op-publication");
+
+    expect(calls[0]?.url).toBe("https://gateway.example.test/v1/publications");
+    expect(calls[0]?.init?.method).toBe("POST");
+    const headers = new Headers(calls[0]?.init?.headers);
+    expect(headers.get("X-API-Key")).toBe("operator-api-key-with-at-least-24-characters");
+    expect(headers.get("X-Actor-Ref")).toBe("zernflow:test");
+    expect(headers.get("X-Workspace-Ref")).toBe("workspace-test");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      account_ref: "0d4d5b1c-7e63-4cb7-a56b-d221d913e6e2",
+      platform: "facebook",
+      kind: "post",
+      text: "Launch update",
+      media: [{ url: "https://cdn.example.test/a.png", content_type: "image/png" }],
+      idempotency_key: "publish:variant:v1:1",
+    });
+    expect(calls[1]?.url).toBe("https://gateway.example.test/v1/operations/op-publication");
+    expect(calls[1]?.init?.method).toBe("GET");
+  });
+
+  it("maps published Gateway errors into SocialGatewayError without leaking bodies", async () => {
+    const transport = httpGatewayPublishingTransport({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "operator-api-key-with-at-least-24-characters",
+      fetchImpl: (async () =>
+        new Response(
+          JSON.stringify({ detail: { code: "publication_account_not_found", message: "account unavailable" } }),
+          { status: 404, headers: { "Content-Type": "application/json" } },
+        )) as typeof fetch,
+      production: true,
+    });
+    await expect(
+      transport.submitPublication(
+        { accountRef: "missing", platform: "facebook", kind: "post", text: "x", media: [], idempotencyKey: "publish:test:1" },
+        AbortSignal.timeout(1000),
+      ),
+    ).rejects.toMatchObject({ code: "publication_account_not_found", status: 404, retryable: false });
   });
 });
 
