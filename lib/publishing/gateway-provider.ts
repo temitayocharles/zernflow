@@ -1,3 +1,4 @@
+import { SocialGatewayError } from "@/lib/social-gateway/client";
 import type { GatewayOperation, SocialGatewayClient } from "@/lib/social-gateway/types";
 import { TaskError } from "@/lib/tasks/errors";
 import {
@@ -52,7 +53,7 @@ export interface GatewayPublishingTransport {
 }
 
 export const GATEWAY_PUBLISHING_BLOCKED_REASON =
-  "Agent Social Gateway publishing is not available yet: the Gateway has not published a publication endpoint (external contract pending). Use manual or browser publishing.";
+  "Agent Social Gateway publishing is unavailable because the server-side Gateway connection is not configured. Use manual or browser publishing.";
 
 /** Platforms the Gateway account model knows (GatewayAccountPlatform minus "generic"). */
 export const GATEWAY_ACCOUNT_PLATFORMS = ["facebook", "instagram", "telegram", "twitter", "bluesky", "reddit"] as const;
@@ -84,6 +85,143 @@ export function blockedGatewayPublishingTransport(
       return operations.getOperation(id);
     },
   };
+}
+
+
+export interface HttpGatewayPublishingTransportOptions {
+  baseUrl: string;
+  apiKey: string;
+  actorRef?: string;
+  workspaceRef?: string;
+  fetchImpl?: typeof fetch;
+  production?: boolean;
+}
+
+interface GatewayErrorEnvelope {
+  detail?: { code?: unknown; message?: unknown };
+}
+
+function gatewayUrl(raw: string, path: string, production: boolean): URL {
+  const base = new URL(raw);
+  if (!["http:", "https:"].includes(base.protocol) || base.username || base.password || base.hash) {
+    throw new Error("Invalid Agent Social Gateway URL");
+  }
+  const loopback = new Set(["localhost", "127.0.0.1", "::1"]).has(base.hostname);
+  if (production && base.protocol !== "https:" && !loopback) {
+    throw new Error("Agent Social Gateway must use HTTPS in production");
+  }
+  base.pathname = base.pathname.replace(/\/+$/, "");
+  return new URL(`${base.pathname}${path}`.replace(/\/+/g, "/"), base);
+}
+
+async function gatewayHttpError(response: Response): Promise<SocialGatewayError> {
+  let code = `social_gateway_http_${response.status}`;
+  let message = "Social gateway request failed";
+  try {
+    const body = (await response.json()) as GatewayErrorEnvelope;
+    if (typeof body.detail?.code === "string") code = body.detail.code;
+    if (typeof body.detail?.message === "string") message = body.detail.message;
+  } catch {
+    // Keep status-derived fallback without leaking an upstream response body.
+  }
+  return new SocialGatewayError(code, message, {
+    status: response.status,
+    retryable:
+      response.status === 408 ||
+      response.status === 425 ||
+      response.status === 429 ||
+      response.status >= 500,
+  });
+}
+
+export function httpGatewayPublishingTransport(
+  options: HttpGatewayPublishingTransportOptions,
+): GatewayPublishingTransport {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const production = options.production ?? false;
+  const headers = (body: boolean) => {
+    const h = new Headers({
+      Accept: "application/json",
+      "X-API-Key": options.apiKey,
+      "X-Actor-Ref": options.actorRef?.trim() || "zernflow",
+      "X-Workspace-Ref": options.workspaceRef?.trim() || "default",
+    });
+    if (body) h.set("Content-Type", "application/json");
+    return h;
+  };
+  const request = async <T>(
+    path: string,
+    init: { method?: "GET" | "POST"; body?: Record<string, unknown>; signal?: AbortSignal } = {},
+  ): Promise<T> => {
+    try {
+      const response = await fetchImpl(gatewayUrl(options.baseUrl, path, production), {
+        method: init.method ?? "GET",
+        headers: headers(init.body !== undefined),
+        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+        cache: "no-store",
+        signal: init.signal,
+      });
+      if (!response.ok) throw await gatewayHttpError(response);
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof SocialGatewayError) throw error;
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new SocialGatewayError("social_gateway_timeout", "Social gateway request timed out", {
+          retryable: true,
+          cause: error,
+        });
+      }
+      throw new SocialGatewayError(
+        "social_gateway_unavailable",
+        "Social gateway is unavailable",
+        { retryable: true, cause: error },
+      );
+    }
+  };
+  return {
+    available: true,
+    idempotentSubmit: true,
+    supports: [{ platform: "facebook", kinds: ["post"] }],
+    unavailableReason: "The Agent Social Gateway does not advertise this publication capability.",
+    async submitPublication(intent, signal) {
+      return request<GatewayOperation>("/v1/publications", {
+        method: "POST",
+        signal,
+        body: {
+          account_ref: intent.accountRef,
+          platform: intent.platform,
+          kind: intent.kind,
+          text: intent.text,
+          media: intent.media.map((m) => ({ url: m.url, content_type: m.contentType })),
+          idempotency_key: intent.idempotencyKey,
+        },
+      });
+    },
+    async getOperation(operationId) {
+      return request<GatewayOperation>(
+        `/v1/operations/${encodeURIComponent(operationId)}`,
+      );
+    },
+  };
+}
+
+export function environmentGatewayPublishingTransport(): GatewayPublishingTransport {
+  const baseUrl =
+    typeof process === "undefined" ? "" : process.env.SOCIAL_GATEWAY_BASE_URL?.trim() ?? "";
+  const apiKey =
+    typeof process === "undefined" ? "" : process.env.SOCIAL_GATEWAY_API_KEY?.trim() ?? "";
+  if (!baseUrl || apiKey.length < 24) return blockedGatewayPublishingTransport();
+  try {
+    return httpGatewayPublishingTransport({
+      baseUrl,
+      apiKey,
+      actorRef: process.env.SOCIAL_GATEWAY_ACTOR_REF,
+      workspaceRef: process.env.SOCIAL_GATEWAY_WORKSPACE_REF,
+      production: process.env.NODE_ENV === "production",
+    });
+  } catch {
+    return blockedGatewayPublishingTransport();
+  }
 }
 
 const MIN_POLL_MS = 5_000;
@@ -185,7 +323,7 @@ let defaultsRegistered = false;
 export function registerDefaultPublishingProviders(): void {
   if (defaultsRegistered) return;
   defaultsRegistered = true;
-  registerPublishingProvider(createGatewayPublishingProvider(blockedGatewayPublishingTransport()));
+  registerPublishingProvider(createGatewayPublishingProvider(environmentGatewayPublishingTransport()));
 }
 
 /** Installs a concrete Gateway transport once the Gateway publishing contract exists. */
