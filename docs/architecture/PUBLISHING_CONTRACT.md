@@ -1,9 +1,11 @@
 # Provider-neutral publishing contract (R10)
 
-Status: **code-complete** for the engine, receipts, reconciliation, UI and
-tests. The **only** blocked piece is the concrete Agent Social Gateway
-*submission* call (label: `EXTERNAL_CONTRACT`) because the Gateway does not
-expose a publication endpoint today. Nothing in this repo invents one.
+Status: **implemented** for the engine, receipts, reconciliation, UI and
+Agent Social Gateway submission/polling transport. The Gateway now publishes
+the durable publication contract used here: `POST /v1/publications` and
+`GET /v1/operations/{id}`. Production availability remains capability-driven
+and requires the server-side Gateway connection plus a commissioned provider
+account.
 
 ## 1. Layers
 
@@ -12,7 +14,7 @@ expose a publication endpoint today. Nothing in this repo invents one.
 | Contract | `lib/publishing/contract.ts` | `PublishingProvider`, `PublishRequest`, `PublishOutcome`, capability levels, registry, outcome validation, failure classification. No provider specifics. |
 | Engine | `lib/publishing/engine.ts` | Idempotency, receipts, polling of accepted operations, ambiguity handling, partial success, retry decisions, variant state transitions. Identical for every provider. |
 | Task integration | `lib/publishing/service.ts` (`content.publish`) | Loads content, validates platform rules, resolves the provider, presigns media, hands off to the engine. |
-| Gateway adapter | `lib/publishing/gateway-provider.ts` | Maps the Gateway operation model onto `PublishOutcome`. Narrow `GatewayPublishingTransport` seam; default transport is blocked. |
+| Gateway adapter | `lib/publishing/gateway-provider.ts` | Maps the published Gateway submission/operation contract onto `PublishOutcome`. The default transport is enabled only when the server-side Gateway URL and operator key are configured. |
 | Legacy seam | `capabilities.ts` `registerApiPublishAdapter` | R4 synchronous adapters are wrapped with `providerFromApiAdapter` (non-idempotent, synchronous). |
 | Receipts | `supabase/migrations/00038_publish_receipts.sql` | `publish_receipts` table, state-machine trigger, RLS (member read, service write), `confirm_manual_publication` (now records a receipt), `resolve_publication`. |
 | UI | `app/(dashboard)/dashboard/content/[draftId]/page.tsx`, `components/campaigns/schedule-panel.tsx` | Per-variant attempt history; reconcile form for ambiguous attempts; API route reasons from provider capabilities. |
@@ -67,20 +69,23 @@ Known and used: `GatewayOperation` (`GET /v1/operations/{id}`). Mapping:
 | `succeeded` | `published` (`external_reference`; URL not invented → null) |
 | `unknown` | `unknown` |
 
-### What the Gateway must publish before the transport can be implemented (EXTERNAL_CONTRACT)
+### Published Gateway transport
 
-A concrete `GatewayPublishingTransport` needs, from the Gateway contract:
+The Gateway contract is now implemented by the default server-side transport:
 
-1. The submission endpoint path, method and auth (expected to reuse the existing bearer + workspace binding).
-2. The request body mapping for `PublicationIntent` (account ref, platform, kind, text, media URLs + content types, idempotency key).
-3. Whether submissions are deduplicated by idempotency key → sets `idempotentSubmit`.
-4. The platform/kind matrix the Gateway can publish → `supports`.
-5. Confirmation that the submission returns a `GatewayOperation` (or its id) readable via `GET /v1/operations/{id}`, and whether `succeeded` operations carry a public post URL.
+1. Submit: `POST /v1/publications` with `X-API-Key`, `X-Workspace-Ref`,
+   and `X-Actor-Ref`.
+2. Body: account UUID, platform, kind, text, media URL/content-type pairs, and
+   the stable idempotency key.
+3. Submission is idempotent at the Gateway durable-operation boundary.
+4. The currently commissioned matrix is intentionally narrow:
+   `facebook/post`. Unsupported platform/kind pairs remain unavailable.
+5. The response is the existing `GatewayOperation`, polled through
+   `GET /v1/operations/{id}`.
 
-Then: implement the transport (one file), call
-`registerGatewayPublishingTransport(transport)` at server start-up, add a
-contract test against the Gateway's published fixtures, and run one live
-publish to a test account (PRODUCTION_CERTIFICATION).
+Production certification still requires a credential-backed test provider
+account and an explicitly intended test publication. The transport itself does
+not fabricate provider support or create a test account.
 
 ## 6. Rollback
 
