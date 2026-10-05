@@ -13,22 +13,17 @@ import {
 /**
  * Agent Social Gateway publishing adapter (R10).
  *
- * The Gateway is the preferred provider/action boundary. Its *operation* model
- * is known and already used by ZernFlow (`GET /v1/operations/{id}`,
- * `POST /v1/operations/{id}/retry`; fields in `GatewayOperation`). What is NOT
- * known is a Gateway endpoint that accepts a publication. Until the Gateway
- * publishes that contract, `submitPublication` is BLOCKED (EXTERNAL_CONTRACT):
- * no endpoint path or wire payload is invented here.
+ * The Gateway is the preferred provider/action boundary. ZernFlow uses the
+ * published durable publication contract: `POST /v1/publications` for
+ * idempotent submission and `GET /v1/operations/{id}` for polling.
  *
- * The seam is deliberately narrow — one method to submit, one to read an
- * operation — so a concrete transport can be dropped in via
- * `registerGatewayPublishingTransport` without touching the engine.
+ * The seam stays deliberately narrow: one method to submit and one to read an
+ * operation, so the provider-neutral publishing engine remains unchanged.
  */
 
 /**
- * ZernFlow-side description of a publication handed to the transport. This is
- * NOT a Gateway wire format; the concrete transport maps it onto whatever the
- * Gateway contract specifies once it exists.
+ * ZernFlow-side description of a publication handed to the transport. The
+ * concrete HTTP transport maps it onto the published Gateway wire contract.
  */
 export interface PublicationIntent {
   idempotencyKey: string;
@@ -66,8 +61,8 @@ export class GatewayPublishingUnavailableError extends TaskError {
 }
 
 /**
- * Default transport: submission blocked (EXTERNAL_CONTRACT); operation reads
- * delegate to the existing Gateway client when one is supplied.
+ * Blocked transport used when the server-side Gateway connection is absent.
+ * Operation reads may still delegate to an existing Gateway client in tests.
  */
 export function blockedGatewayPublishingTransport(
   operations?: Pick<SocialGatewayClient, "getOperation"> | null,
@@ -319,14 +314,14 @@ export function createGatewayPublishingProvider(transport: GatewayPublishingTran
 
 let defaultsRegistered = false;
 
-/** Registers the Gateway provider with the blocked transport (idempotent). */
+/** Registers the Gateway provider from server-side configuration (idempotent). */
 export function registerDefaultPublishingProviders(): void {
   if (defaultsRegistered) return;
   defaultsRegistered = true;
   registerPublishingProvider(createGatewayPublishingProvider(environmentGatewayPublishingTransport()));
 }
 
-/** Installs a concrete Gateway transport once the Gateway publishing contract exists. */
+/** Installs an explicit Gateway transport, primarily for tests and controlled overrides. */
 export function registerGatewayPublishingTransport(transport: GatewayPublishingTransport): void {
   defaultsRegistered = true;
   registerPublishingProvider(createGatewayPublishingProvider(transport));
